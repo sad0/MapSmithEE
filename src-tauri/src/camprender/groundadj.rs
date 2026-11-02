@@ -1,6 +1,7 @@
 //! A ground layer's colour adjustment from the editor, baked into a copy of its texture: the Rust twin of
 //! `E:/AI/bg3d/tools/groundadj.py`. The CSS filter chain the editor draws with, hue-rotate(h) saturate(s)
-//! brightness(b) contrast(c), on sRGB values, in that order.
+//! brightness(b) contrast(c), on sRGB values, in that order. Saved as PNG: groundadj.py saved a JPEG (quality 92),
+//! whose own artefacts (~1.5 to 3 / 255 on a busy texture) are left out rather than imitated.
 
 use std::path::{Path, PathBuf};
 
@@ -8,9 +9,6 @@ use image::RgbImage;
 use serde_json::Value;
 
 use super::{cache_key, img_err, io_err};
-
-/// JPEG quality of the baked copy (PIL's `quality=92` in the original)
-const QUALITY: u8 = 92;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Adj {
@@ -67,25 +65,19 @@ pub fn apply(img: &mut RgbImage, a: &Adj) {
     }
 }
 
-/// `<out_dir>/<layer>_adj_<key>.jpg`: the layer's texture `src` with `a` applied, made unless already there.
+/// `<out_dir>/<layer>_adj_<key>.png`: the layer's texture `src` with `a` applied, made unless already there.
 pub fn make(src: &Path, layer: &str, a: &Value, out_dir: &Path) -> Result<PathBuf, String> {
     let key = cache_key(&format!("{}|{}", src.display(), a));
     let safe: String = layer.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
-    let path = out_dir.join(format!("{safe}_adj_{key}.jpg"));
+    let path = out_dir.join(format!("{safe}_adj_{key}.png"));
     if path.exists() {
         return Ok(path);
     }
     std::fs::create_dir_all(out_dir).map_err(|e| io_err(out_dir, e))?;
     let mut img = image::open(src).map_err(|e| img_err(src, e))?.to_rgb8();
     apply(&mut img, &Adj::from_value(a));
-    let tmp = path.with_extension("jpg.tmp");
-    {
-        let f = std::fs::File::create(&tmp).map_err(|e| io_err(&tmp, e))?;
-        let mut w = std::io::BufWriter::new(f);
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut w, QUALITY)
-            .encode_image(&img)
-            .map_err(|e| img_err(&tmp, e))?;
-    }
+    let tmp = path.with_extension("png.tmp");
+    img.save_with_format(&tmp, image::ImageFormat::Png).map_err(|e| img_err(&tmp, e))?;
     std::fs::rename(&tmp, &path).map_err(|e| io_err(&path, e))?;
     Ok(path)
 }
