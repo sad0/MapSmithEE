@@ -22,6 +22,11 @@ flate2 = "1.1.10"
 png = "0.17"
 base64 = "0.22"
 memmap2 = "0.9"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "http2"] }
+sha2 = "0.11.1"
+hex = "0.4.3"
+zip = "9.1.0"
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [profile.release]
 codegen-units = 1

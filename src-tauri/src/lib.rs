@@ -3,6 +3,7 @@
 pub mod are;
 pub mod bmpmap;
 pub mod camp3d;
+pub mod library;
 pub mod render;
 pub mod res;
 pub mod tis;
@@ -31,6 +32,61 @@ pub struct Settings {
     pub install_targets: Vec<String>,
     /// folders MapSmithEE never writes into
     pub blocked: Vec<String>,
+    /// the full model library for renders; empty = <app data>/library
+    #[serde(default)]
+    pub library_dir: String,
+    /// blender.exe; empty = found automatically
+    #[serde(default)]
+    pub blender_exe: String,
+}
+
+/// where the render library lives: the setting, else <app data>/library, else John's working copy when it exists
+pub fn library_dir(app: &tauri::AppHandle) -> PathBuf {
+    let s = load_settings(app);
+    if !s.library_dir.is_empty() {
+        return PathBuf::from(s.library_dir);
+    }
+    let own = app.path().app_data_dir().unwrap_or_default().join("library");
+    let dev = PathBuf::from("E:/AI/bg3d");
+    if !library::is_library(&own) && library::is_library(&dev) { dev } else { own }
+}
+
+/// the release manifest of the model library
+const LIBRARY_MANIFEST: &str = "https://github.com/sad0/MapSmithEE/releases/download/library-v1/library-manifest.json";
+static LIBRARY_CANCEL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn library_status(app: tauri::AppHandle) -> library::Status {
+    library::status(&library_dir(&app))
+}
+
+#[derive(Serialize, Clone)]
+struct LibraryProgress {
+    done: u64,
+    total: u64,
+    step: String,
+}
+
+#[tauri::command]
+async fn library_install(app: tauri::AppHandle) -> Res<library::Status> {
+    use tauri::Emitter;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("library");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    LIBRARY_CANCEL.store(false, std::sync::atomic::Ordering::Relaxed);
+    let a2 = app.clone();
+    let progress = move |done: u64, total: u64, step: &str| {
+        a2.emit("library-progress", LibraryProgress { done, total, step: step.to_string() }).ok();
+    };
+    let st = library::install(LIBRARY_MANIFEST, &dir, &progress, &LIBRARY_CANCEL).await?;
+    let mut s = load_settings(&app);
+    s.library_dir = dir.to_string_lossy().into_owned();
+    settings_set(app, s)?;
+    Ok(st)
+}
+
+#[tauri::command]
+fn library_cancel() {
+    LIBRARY_CANCEL.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Res<PathBuf> {
@@ -331,6 +387,9 @@ pub fn run() {
             area_save,
             area_install,
             tlk_string,
+            library_status,
+            library_install,
+            library_cancel,
             camp3d::camp3d_get,
             camp3d::camp3d_set,
             camp3d::camp3d_update,
