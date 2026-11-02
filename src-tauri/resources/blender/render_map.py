@@ -2,12 +2,14 @@
 # orthographic camera looking north 38° down, 60 px per metre. Usage:
 #   blender -b -P render_map.py -- <layout.json> <ground.json> <out.png> [samples] [time] [x0 y0 x1 y1 (px crop)]
 # layout.json / ground.json: the editor's maps/camp3d and maps/camp3d_ground documents.
+# Run by MapSmithEE (src-tauri/src/camprender), which sets MAPSMITH_LIBRARY / MAPSMITH_WORK (see paths.py), and
+# MAPSMITH_CANVAS (a JSON file: item index -> its tent / rug canvas PNG, made beforehand: Blender's Python has no PIL).
+# Lines starting with 'MAPSMITH ' are progress for MapSmithEE.
 import bpy, sys, os, json, math, base64
 from mathutils import Vector, Quaternion
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import norm
-
-B3 = 'E:/AI/bg3d'; TEX = f'{B3}/tex'
+from paths import LIB, WORK, TEX, lib as libpath
 a = sys.argv[sys.argv.index('--') + 1:]
 L, G, OUT = json.load(open(a[0])), json.load(open(a[1])), a[2]
 L, G = L.get('data', L), G.get('data', G)
@@ -18,10 +20,10 @@ if G.get('split'):
 SAMPLES = int(a[3]) if len(a) > 3 else 128
 HOUR = float(a[4]) if len(a) > 4 and a[4] != '-' else L.get('time', 14)
 CROP = [int(v) for v in a[5:9]] if len(a) > 8 else None
-MODELS = json.load(open(f'{B3}/models.json'))
+MODELS = json.load(open(f'{LIB}/models.json'))
 PROXY_DIMS = {}
-for _f in os.listdir(f'{B3}/proxies'):
-    if _f.startswith('index') and _f.endswith('.json'): PROXY_DIMS.update({k: v['dims'] for k, v in json.load(open(f'{B3}/proxies/{_f}')).items()})
+for _f in os.listdir(f'{LIB}/proxies'):
+    if _f.startswith('index') and _f.endswith('.json'): PROXY_DIMS.update({k: v['dims'] for k, v in json.load(open(f'{LIB}/proxies/{_f}')).items()})
 # per-model height corrections from the editor's Calibrate mode (db models/offsets, exported next to the layout)
 OFF_F = os.path.join(os.path.dirname(a[0]), 'models', 'offsets.json')
 OFFSETS = (lambda d: d.get('data', d).get('offsets', {}))(json.load(open(OFF_F))) if os.path.exists(OFF_F) else {}
@@ -34,9 +36,16 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 sc.render.engine = 'CYCLES'
 prefs = bpy.context.preferences.addons['cycles'].preferences
-prefs.compute_device_type = 'OPTIX'; prefs.get_devices()
+# OptiX first (the reference renders), else the first GPU backend this machine has, else the CPU
+for _kind in ('OPTIX', 'CUDA', 'HIP', 'ONEAPI', 'METAL'):
+    try: prefs.compute_device_type = _kind
+    except TypeError: continue
+    prefs.get_devices()
+    if any(d.type == _kind for d in prefs.devices): break
 for d in prefs.devices: d.use = True
-sc.cycles.device = 'GPU'; sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
+sc.cycles.device = 'GPU' if any(d.type != 'CPU' for d in prefs.devices) else 'CPU'
+sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
+print('MAPSMITH device', prefs.compute_device_type, sc.cycles.device, flush=True)
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.exposure = -0.4
 
 def three_to_bl(p): return Vector((p[0], -p[2], p[1]))     # editor (x, y up, z south) -> Blender (x, y north, z up)
@@ -47,7 +56,7 @@ gnd.scale = (W, D, 1); bpy.ops.object.transform_apply(scale=True)
 mat = bpy.data.materials.new('ground'); mat.use_nodes = True; nt = mat.node_tree; p = nt.nodes['Principled BSDF']
 p.inputs['Roughness'].default_value = 1.0
 uv = nt.nodes.new('ShaderNodeTexCoord')
-os.makedirs(f'{B3}/out/masks', exist_ok=True)
+os.makedirs(f'{WORK}/masks', exist_ok=True)
 TEXFILES = json.loads(os.environ.get('BG3D_TEXFILES') or '{}')   # recoloured layers (render_scene.py)
 TEXM_BY = G.get('tex_m_by', {})                                  # metres per image, per layer (BG-pixel textures differ)
 def mix(a, b, fac, kind='RGBA'):
@@ -71,7 +80,7 @@ for i, name in enumerate(G['layers']):
     if i == 0: col, hgt = t.outputs[0], h_out; continue
     url = G['masks'][i]
     if not url: continue
-    path = f"{B3}/out/masks/m{i}.{'webp' if url.startswith('data:image/webp') else 'png'}"; open(path, 'wb').write(base64.b64decode(url.split(',', 1)[1]))
+    path = f"{WORK}/masks/m{i}.{'webp' if url.startswith('data:image/webp') else 'png'}"; open(path, 'wb').write(base64.b64decode(url.split(',', 1)[1]))
     mk = nt.nodes.new('ShaderNodeTexImage'); mk.image = bpy.data.images.load(path); mk.image.colorspace_settings.name = 'Non-Color'
     nt.links.new(uv.outputs['UV'], mk.inputs[0]); mk.interpolation = 'Cubic'
     col = mix(col, t.outputs[0], mk.outputs['Alpha'])
@@ -86,7 +95,7 @@ gnd.data.materials.append(mat)
 lib = bpy.data.collections.new('lib'); sc.collection.children.link(lib)
 lay = sc.view_layers[0].layer_collection.children['lib']; lay.exclude = True
 proto = {}
-import canvas as canvas_gen
+CANVAS = json.load(open(os.environ['MAPSMITH_CANVAS'])) if os.environ.get('MAPSMITH_CANVAS') else {}
 insts = []   # (item index, object) for the id pass
 decals = []  # BG trees' painted shadows: not pieces, left out of the coverage and id passes
 SIN, COS = math.sin(ELEV), math.cos(ELEV)
@@ -158,7 +167,7 @@ def bgsprite(mid, B, s):
             uvl = me.uv_layers.new()
             for li, vi in enumerate(me.polygons[0].vertices): x, y = corners[vi]; uvl.data[li].uv = (x / w, 1 - y / h)
             m = bpy.data.materials.new(f'{mid}_{kind}'); m.use_nodes = True; n = m.node_tree; n.nodes.clear()
-            o_ = n.nodes.new('ShaderNodeOutputMaterial'); tx = n.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(B[kind])
+            o_ = n.nodes.new('ShaderNodeOutputMaterial'); tx = n.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(libpath(B[kind]))
             mx = n.nodes.new('ShaderNodeMixShader'); tr = n.nodes.new('ShaderNodeBsdfTransparent')
             if kind == 'tree':   # pre-lit art: emitted as painted
                 em = n.nodes.new('ShaderNodeEmission'); em.inputs['Strength'].default_value = SPRITE_K
@@ -178,6 +187,7 @@ def bgsprite(mid, B, s):
     return objs
 for idx, it in enumerate(L['items']):
     mid = it['m']
+    if idx % 10 == 0: print(f"MAPSMITH items {idx}/{len(L['items'])}", flush=True)
     if mid not in MODELS: continue
     if 'bgsprite' in MODELS[mid]['src']:
         tree_o, shad_o = bgsprite(mid, MODELS[mid]['src']['bgsprite'], it.get('s', 1))
@@ -193,7 +203,7 @@ for idx, it in enumerate(L['items']):
     if look:
         # a tent gets its own copy (mesh shared) whose canvas slot carries this tent's pattern image
         src = proto[mid].objects[0]; inst = src.copy(); sc.collection.objects.link(inst)
-        img = bpy.data.images.load(canvas_gen.make(look), check_existing=True)
+        img = bpy.data.images.load(CANVAS[str(idx)], check_existing=True)
         for k, slot in enumerate(inst.material_slots):
             if slot.material and slot.material.name.startswith('canvas'):
                 m = slot.material.copy(); slot.link = 'OBJECT'; slot.material = m
@@ -210,7 +220,7 @@ for idx, it in enumerate(L['items']):
     inst.location.z += (OFFSETS.get(mid, 0) - MODELS[mid].get('sink', 0)) * s * sz[1]
     recolour(inst, it.get('col'))
     insts.append((idx, inst))
-print('placed', len(L['items']), 'items,', len(proto), 'models')
+print('placed', len(L['items']), 'items,', len(proto), 'models', flush=True)
 
 # ---------- light: the editor's sun for that hour ----------
 h = HOUR; day = max(0, math.sin((h - 6) / 12 * math.pi))
@@ -239,7 +249,7 @@ for it in L['items']:
     # at least 0.7 m up: a light sitting in the pit burns its stones white
     l.location = three_to_bl(it['p']) + Vector((0, 0, max(0.7, f[0] * dims[2] * s_)))
     l.data.energy = f[1] * s_ * DAYK; l.data.color = (1.0, 0.52, 0.2); l.data.shadow_soft_size = f[2] * s_; nf += 1
-print('fire lights', nf)
+print('fire lights', nf, flush=True)
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
 w.node_tree.nodes['Background'].inputs[0].default_value = (0.04, 0.05, 0.1, 1) if night else (0.5, 0.56, 0.68, 1)
 w.node_tree.nodes['Background'].inputs[1].default_value = 0.35 if night else 0.9
@@ -256,14 +266,16 @@ if CROP:
     sc.render.border_min_x, sc.render.border_max_x = x0 / MAPW, x1 / MAPW
     sc.render.border_min_y, sc.render.border_max_y = 1 - y1 / MAPH, 1 - y0 / MAPH
 sc.render.image_settings.file_format = 'PNG'; sc.render.filepath = OUT
+print('MAPSMITH stage render', flush=True)
 bpy.ops.render.render(write_still=True)
-print('rendered', OUT)
+print('rendered', OUT, flush=True)
 
 if os.environ.get('BG3D_IDPASS'):
     # 1) coverage: the pieces alone (ground hidden), transparent background; the alpha keeps leaf cards' real holes
     for d_ in decals: d_.hide_render = True
     gnd.hide_render = True; sc.render.film_transparent = True; sc.cycles.samples = 16; sc.cycles.use_denoising = False
     sc.render.image_settings.color_mode = 'RGBA'
+    print('MAPSMITH stage alpha', flush=True)
     sc.render.filepath = OUT[:-4] + '_alpha.png'; bpy.ops.render.render(write_still=True)
     gnd.hide_render = False; sc.render.film_transparent = False
     # 2) id pass: every piece in a flat colour that encodes its item index + 1, the ground black; no antialiasing, so
@@ -276,5 +288,6 @@ if os.environ.get('BG3D_IDPASS'):
     for idx, inst in insts:
         v = idx + 1; inst.color = (((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255, 1)
     sc.render.image_settings.color_depth = '8'; sc.render.image_settings.color_mode = 'RGB'
+    print('MAPSMITH stage id', flush=True)
     sc.render.filepath = OUT[:-4] + '_id.png'; bpy.ops.render.render(write_still=True)
-    print('rendered id', sc.render.filepath)
+    print('rendered id', sc.render.filepath, flush=True)

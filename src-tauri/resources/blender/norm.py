@@ -2,8 +2,8 @@
 # centred on x/y and standing on z = 0. Shared by proxy.py (light editor copy) and render_map.py (full render).
 import bpy, os, sys
 from mathutils import Vector
-
-ASSETS = 'E:/AI/bg3d/assets'
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import ASSETS, lib
 
 def load(M, name='model'):
     sc = bpy.context.scene
@@ -18,7 +18,7 @@ def load(M, name='model'):
         import logseat
         logseat.build(src['logseat'])
     else:
-        path = src['glb'] if 'glb' in src else [f"{ASSETS}/{src['asset']}/{f}" for f in os.listdir(f"{ASSETS}/{src['asset']}") if f.endswith('.gltf')][0]
+        path = lib(src['glb']) if 'glb' in src else [f"{ASSETS}/{src['asset']}/{f}" for f in os.listdir(f"{ASSETS}/{src['asset']}") if f.endswith('.gltf')][0]
         bpy.ops.import_scene.gltf(filepath=path)
     new = [o for o in bpy.data.objects if o not in before]
     if src.get('only'):

@@ -5,8 +5,7 @@
 # eaves (0.5) and on to the ridge or apex (1). The canvas material is named "canvas" so the editor can find it.
 import bpy, math, random
 from mathutils import Vector
-
-TEX = 'E:/AI/bg3d/tex'
+from paths import TEX
 
 
 def canvas_mat(T):

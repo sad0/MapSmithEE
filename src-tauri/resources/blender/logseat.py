@@ -4,8 +4,7 @@
 # T = {"kind": "halflog"|"log"|"stool"|"backrest", "length": m, "height": m, "trunk": asset, "stump": asset, "seed": n}
 import bpy, bmesh, math, os, random
 from mathutils import Vector, Matrix
-
-ASSETS = 'E:/AI/bg3d/assets'
+from paths import ASSETS, TEX
 
 def load(asset, only=None):
     before = set(bpy.data.objects)
@@ -50,7 +49,7 @@ def sawn_mat():
     m = bpy.data.materials.get('sawn')
     if m: return m
     m = bpy.data.materials.new('sawn'); m.use_nodes = True; n = m.node_tree; p = n.nodes['Principled BSDF']
-    t = n.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load('E:/AI/bg3d/tex/oak_veneer_01/diff_2k.jpg')
+    t = n.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(f'{TEX}/oak_veneer_01/diff_2k.jpg')
     n.links.new(t.outputs['Color'], p.inputs['Base Color']); p.inputs['Roughness'].default_value = 0.85
     return m
 
