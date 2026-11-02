@@ -1,0 +1,1369 @@
+<meta charset="utf-8">
+<title>Camp Map 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{--bg:#16130f;--panel:#201b15;--line:#3a3127;--fg:#e9dfcc;--mute:#a8987d;--accent:#d9a441;--ok:#8fbf6a;--warn:#e0a050;--sel:#ffd27a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:13px/1.4 "Alegreya Sans",system-ui,sans-serif;height:100vh;overflow:hidden;display:grid;grid-template-columns:250px 1fr 250px;grid-template-rows:auto 1fr;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+header{grid-column:1/4;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px max(12px,env(safe-area-inset-right,0px)) 6px max(12px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font:600 16px "Cinzel",Georgia,serif;margin:0 8px 0 0;color:var(--accent);letter-spacing:.04em}
+button,select,input{font:inherit;color:var(--fg);background:#2b241c;border:1px solid var(--line);border-radius:4px;padding:3px 8px}
+button:hover{border-color:var(--accent)}button.on{background:var(--accent);color:#1b150d;border-color:var(--accent)}
+.grp{display:flex;gap:4px;align-items:center}.lbl{color:var(--mute);font-size:12px}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:8px;min-width:0}
+aside.r{border-right:0;border-left:1px solid var(--line)}
+#tray{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:max-content;align-content:start;gap:4px;margin-top:6px}
+/* left panel: search, filters and hint stay put, only the tray scrolls */
+aside.l{display:flex;flex-direction:column;overflow:hidden}
+aside.l > *{flex:none}
+aside.l #tray{flex:1 1 auto;min-height:0;overflow:auto;margin-right:-4px;padding-right:4px}
+#cats{display:flex;flex-wrap:wrap;gap:3px;margin:6px 0 2px}
+#cats button{width:28px;height:26px;padding:0;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+#cats button[disabled]{opacity:.35}
+#group{width:96px;flex:none}
+.tile{padding:2px;height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10px;color:var(--mute);overflow:hidden}
+.tile .th{width:58px;height:58px;flex:none;background:url(thumbs.jpg) no-repeat;background-size:928px auto}
+.tile.pick{border-color:var(--accent)}
+main{position:relative;min-width:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%;outline:none}
+.status{font-size:12px;color:var(--mute)}.status.ok{color:var(--ok)}.status.warn{color:var(--warn)}
+.row{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.row label{min-width:62px;color:var(--mute)}
+h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent);margin:12px 0 4px;text-transform:uppercase}
+.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.sw{height:44px;background-size:cover;border:2px solid transparent;border-radius:4px;font-size:10px;display:flex;align-items:flex-end;padding:2px;text-shadow:0 1px 2px #000}
+.sw.on{border-color:var(--accent)}
+#swatches{max-height:260px;overflow:auto}
+.hint{color:var(--mute);font-size:11px;margin:4px 0}
+#giz{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
+#giz b{position:absolute;pointer-events:auto;cursor:grab;width:26px;height:26px;margin:-13px 0 0 -13px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;line-height:1;border-radius:4px;color:#fff;text-shadow:0 1px 2px #000;user-select:none;touch-action:none}
+#giz .gy{background:#3c9d3c;top:-70px}#giz .gz{background:#3b5fc4;top:70px}#giz .gx{background:#c43b3b;left:70px}
+#giz .gc{background:#0008;border:1px solid #fff8}
+#giz::before,#giz::after{content:"";position:absolute;background:#fff6}
+#giz::before{left:-1px;top:-58px;width:2px;height:116px}#giz::after{top:-1px;left:0;width:58px;height:2px}
+#mapPanel{position:absolute;top:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;z-index:5;max-width:min(560px,calc(100% - 24px))}
+#mapPanel .row label{min-width:0}
+.spot{margin:2px 0}.spot.on{background:var(--accent);color:#1b150d}
+#toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:#000c;padding:6px 12px;border-radius:4px;display:none}
+@media (max-width:760px){body{grid-template-columns:1fr;grid-template-rows:auto 45vh auto auto;overflow:auto;height:auto}header{grid-column:1}aside,aside.r{border:0}aside.l #tray{max-height:60vh}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Alegreya+Sans:wght@400;500&display=swap">
+
+<header>
+  <h1>Camp Map 3D</h1>
+  <div class="grp"><span class="lbl">View</span><button id="vBG" class="on" title="The game's camera">BG camera</button><button id="vFree" title="Orbit freely">Free</button></div>
+  <div class="grp"><span class="lbl">Tool</span><button id="tSel" class="on">Select (Q)</button><button id="tPaint">Paint ground</button><button id="tTrees">Tree brush</button><button id="tCamp" title="Where the camp people stand, the arrival point, the exits">Camp spots</button><button id="tWalk" title="Where the party can walk (the game's search map)">Walkable</button></div>
+  <div class="grp"><span class="lbl">Light</span><button id="tDay" class="on" title="BG's sun: south-west, 45°, shadows up-right">Day</button><button id="tNight" title="Moonlight; fires, braziers, lanterns and torches lit">Night</button></div>
+  <div class="grp"><span class="lbl">Map</span><select id="mapSel"></select><button id="mapNew">New map</button><button id="mapResize">Resize</button></div>
+  <div class="grp"><button id="calib" title="One of each model of the selected group: set each one's height on the ground, once for all">Calibrate</button><button id="calibSave" hidden>Save heights</button></div>
+  <div class="grp"><button id="undo" title="Undo (Ctrl+Z)">↶</button><button id="redo" title="Redo (Ctrl+Y)">↷</button></div>
+  <div class="grp"><button id="saveNow" title="Write the map, the painted ground and the walkable corrections now">Save</button><button id="preview" title="Ask Claude for a Blender render of what the BG camera sees">Preview render</button></div>
+  <span id="status" class="status">Loading…</span>
+</header>
+
+<aside class="l">
+  <div class="row"><input id="search" placeholder="Search" style="flex:1;min-width:0"><select id="group" title="Place: where this kind of object is found"></select></div>
+  <div id="cats"></div>
+  <div class="hint">Click a model, then click the ground to place it.</div>
+  <div id="tray"></div>
+</aside>
+
+<main><canvas id="cv" tabindex="0"></canvas><div id="toast"></div>
+  <div id="mapPanel" hidden>
+    <h2 id="mpTitle">New map</h2>
+    <div class="row" id="mpNameRow"><label>Name</label><input id="mpName" placeholder="Forest clearing" style="flex:1"></div>
+    <div class="row"><label>Presets</label><button data-preset="small">Small 30×22</button><button data-preset="medium">Medium 40×30</button><button data-preset="large">Large 60×45</button><button data-preset="huge">Huge 80×60</button></div>
+    <div class="row"><label>Tiles</label><input id="mpW" type="number" min="10" max="120" style="width:70px"> × <input id="mpH" type="number" min="8" max="120" style="width:70px"><span class="hint">64 px each, like the game</span></div>
+    <div id="mpSides">
+      <div class="row"><label>Grow</label><label><input id="mpWest" type="checkbox"> West (left)</label><label><input id="mpEast" type="checkbox" checked> East (right)</label></div>
+      <div class="row"><label></label><label><input id="mpNorth" type="checkbox"> North (top)</label><label><input id="mpSouth" type="checkbox" checked> South (bottom)</label></div>
+      <div class="hint">Both sides of an axis ticked: half each. A smaller size cuts on the ticked sides.</div>
+    </div>
+    <div class="row"><button id="mpOk" class="on">OK</button><button id="mpCancel">Cancel</button></div>
+  </div>
+  <div id="giz" hidden>
+    <b class="gy" data-ax="y" title="Height">▲</b><b class="gz" data-ax="z" title="Depth (towards / away from the camera)">▼</b>
+    <b class="gx" data-ax="x" title="Left / right">▶</b><b class="gc" data-ax="ground" title="Slide on the ground">✥</b>
+  </div>
+</main>
+
+<aside class="r">
+  <div id="selBox">
+    <h2>Selection</h2>
+    <div id="selName" class="hint">Nothing selected</div>
+    <div class="row"><button id="mMove" class="on">Move (W)</button><button id="mRot">Rotate (E)</button><button id="mScale">Scale (R)</button></div>
+    <div class="row"><button id="ground" title="Lower the piece until it rests on the ground">Rest on ground (G)</button></div>
+    <div class="row"><button id="dup">Duplicate (Ctrl+D)</button><button id="del">Delete (Del)</button></div>
+    <div class="row"><label>Turn</label><button data-turn="-90">−90°</button><button data-turn="-15">−15°</button><button data-turn="15">+15°</button><button data-turn="90">+90°</button></div>
+    <div class="row"><label>Lay down</label><button id="layX">On its side</button><button id="layZ">Tip over</button></div>
+    <div class="row"><label>Scale</label><input id="scl" type="range" min="0.3" max="3" step="0.01" value="1" style="flex:1"><span id="sclL" class="lbl">1.00</span></div>
+    <h2>Colour</h2>
+    <div class="row"><label>Hue</label><input id="oH" type="range" min="-180" max="180" step="2" style="flex:1"><span id="oHL" class="lbl"></span></div>
+    <div class="row"><label>Saturation</label><input id="oS" type="range" min="0" max="2" step="0.02" style="flex:1"><span id="oSL" class="lbl"></span></div>
+    <div class="row"><label>Brightness</label><input id="oB" type="range" min="0.3" max="1.7" step="0.02" style="flex:1"><span id="oBL" class="lbl"></span></div>
+    <div class="row"><label>Contrast</label><input id="oC" type="range" min="0.4" max="1.8" step="0.02" style="flex:1"><span id="oCL" class="lbl"></span></div>
+    <div class="row"><button id="oReset">Reset colour</button><span class="hint">this piece only (duplicates keep it)</span></div>
+    <div id="flameBox" hidden>
+      <h2>Flame</h2>
+      <div class="row"><label>In game</label><select id="selFlame" style="flex:1"><option value="">No flame</option><option value="FPIT1S">Small camp fire</option><option value="FPIT1M">Medium camp fire</option><option value="FPIT1L">Large camp fire</option></select></div>
+      <div class="hint">The game's flame, a piece of its own: move it with the gizmo (no link to the fire pit under it).</div>
+    </div>
+    <div id="tentBox" hidden>
+      <h2>Canvas</h2>
+      <div class="row"><label>Colours</label><input id="tc1" type="color" value="#d8cbb0"><input id="tc2" type="color" value="#7a2a1e"></div>
+      <div class="row"><label>Pattern</label><select id="tpat" style="flex:1"><option value="plain">Plain</option><option value="stripes">Stripes</option><option value="bands">Bands</option><option value="checks">Checks</option><option value="chevrons">Chevrons</option><option value="border">Border</option><option value="medallion">Medallion (rug)</option><option value="kilim">Kilim (rug)</option><option value="diamonds">Diamonds (rug)</option></select></div>
+      <div class="row"><label>Count</label><input id="tn" type="range" min="1" max="16" step="1" value="6" style="flex:1"><span id="tnL" class="lbl">6</span></div>
+      <div class="row"><label>Wear</label><input id="tw" type="range" min="0" max="1" step="0.05" value="0.3" style="flex:1"></div>
+      <h2>Size</h2>
+      <div class="row"><label>Width</label><input id="tsx" type="range" min="0.5" max="2" step="0.05" value="1" style="flex:1"></div>
+      <div class="row"><label>Depth</label><input id="tsz" type="range" min="0.5" max="2" step="0.05" value="1" style="flex:1"></div>
+      <div class="row"><label>Height</label><input id="tsy" type="range" min="0.5" max="2" step="0.05" value="1" style="flex:1"></div>
+    </div>
+  </div>
+  <div id="paintBox" hidden>
+    <h2>Ground</h2>
+    <div class="swatches" id="swatches"></div>
+    <h2 id="adjT">Colour</h2>
+    <div class="row"><label>Hue</label><input id="aH" type="range" min="-180" max="180" step="2" style="flex:1"><span id="aHL" class="lbl"></span></div>
+    <div class="row"><label>Saturation</label><input id="aS" type="range" min="0" max="2" step="0.02" style="flex:1"><span id="aSL" class="lbl"></span></div>
+    <div class="row"><label>Brightness</label><input id="aB" type="range" min="0.4" max="1.6" step="0.02" style="flex:1"><span id="aBL" class="lbl"></span></div>
+    <div class="row"><label>Contrast</label><input id="aC" type="range" min="0.4" max="1.8" step="0.02" style="flex:1"><span id="aCL" class="lbl"></span></div>
+    <div class="row"><button id="aReset">Reset colour</button><span class="hint">this layer, everywhere on the map</span></div>
+    <div class="row"><label>Brush</label><input id="bSize" type="range" min="0.5" max="30" step="0.1" value="2.5" style="flex:1"><span id="bSizeL" class="lbl"></span></div>
+    <div class="hint">[ and ] change the brush size.</div>
+    <div class="row"><label>Strength</label><input id="bStr" type="range" min="0.05" max="1" step="0.05" value="0.5" style="flex:1"></div>
+    <div class="hint">Drag on the ground. Right drag or Alt to orbit in Free view.</div>
+  </div>
+  <div id="campBox" hidden>
+    <h2>Camp spots</h2>
+    <div class="hint">Drag a person where they stand (the camp fire moves with its fire pit), or pick one in the list and click the ground. Facing sets where they look.</div>
+    <div id="spotList"></div>
+    <div class="row"><label>Facing</label><select id="spotFace" style="flex:1"><option value="0">South (towards the camera)</option><option value="2">South-west</option><option value="4">West</option><option value="6">North-west</option><option value="8">North</option><option value="10">North-east</option><option value="12">East</option><option value="14">South-east</option></select></div>
+    <h2>Exits</h2>
+    <div class="hint">Draw: drag a box on the ground. Standing in it with the party gathered opens the world map.</div>
+    <div class="row"><button id="exitDraw">Draw an exit</button></div>
+    <div id="exitList"></div>
+  </div>
+  <div id="walkBox" hidden>
+    <h2>Walkable</h2>
+    <div class="hint">Red: blocked. Objects block their footprint by themselves (trees their trunk; grass, ferns and small props do not). Paint to correct.</div>
+    <div class="row"><button id="wBlock" class="on">Block</button><button id="wFree">Free</button><button id="wAuto">Back to automatic</button></div>
+    <div class="row"><label>Brush</label><input id="wSize" type="range" min="0.3" max="20" step="0.1" value="1" style="flex:1"><span id="wSizeL" class="lbl"></span></div>
+  </div>
+  <div id="treeBox" hidden>
+    <h2>Tree brush</h2>
+    <div class="row"><label>Kinds</label></div>
+    <div id="treeKinds"></div>
+    <div class="row"><label>Radius</label><input id="tSize" type="range" min="1" max="40" step="0.5" value="5" style="flex:1"><span id="tSizeL" class="lbl"></span></div>
+    <div class="row"><label>Spacing</label><input id="tGap" type="range" min="1" max="8" step="0.25" value="3" style="flex:1"></div>
+    <div class="row"><label>Tree size</label><input id="tScale" type="range" min="0.3" max="1.3" step="0.05" value="0.6" style="flex:1"><span id="tScaleL" class="lbl">0.60</span></div>
+    <div class="hint">Poly Haven trees are real size (firs 15–19 m); BG's trees read smaller.</div>
+    <div class="row"><label>Erase</label><input id="tErase" type="checkbox"> <span class="hint">remove trees under the brush</span></div>
+  </div>
+  <h2>Map</h2>
+  <div class="row"><label>Game scale</label><input id="pxm" type="range" min="24" max="64" step="1" value="42" style="flex:1"><span id="pxmL" class="lbl">42 px/m</span><button id="pxmApply" hidden>Apply</button></div>
+  <div class="hint">Fewer px/m = smaller objects next to the game's characters. The map keeps its size in metres; its tile count follows.</div>
+  <div class="row"><label><input id="people" type="checkbox"> Show BG people</label></div>
+  <div class="hint">At their real size in the game: an NPC on each camp spot, a party (human, elf, dwarf, halfling) at the arrival point.</div>
+  <div class="hint" id="mapInfo"></div>
+  <div class="hint">Controls: left drag = tool · wheel = zoom · middle drag = pan · Free view: right drag = orbit.</div>
+</aside>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/TransformControls.js"></script>
+<script src="shim.js"></script>
+<script>
+/* Camp Map 3D: place 3D models on a painted ground, seen through Baldur's Gate's own camera (orthographic, looking
+   north, 38° down, each map at its own px per metre). The layout is saved to the artifact database (maps/camp3d) and rendered for the
+   game by Blender with the full models. three.js coordinates: x east, y up, z south (towards the camera). */
+const $ = id => document.getElementById(id);
+// Object categories for the tray, by object type (models.json `label` -> category). The model's `group` (camp, town,
+// temple...) stays a second filter, "place". A label missing here goes to Buildings & decor (CAT_DEFAULT) and is
+// logged once to the console.
+const CATEGORIES = [
+  { id: 'nature', name: 'Nature', icon: '\u{1F332}', labels: ['tree', 'bg tree', 'bg grove', 'conifer', 'bush', 'rock', 'grass', 'fern', 'moss', 'stump', 'dead tree', 'roots'] },
+  { id: 'tents', name: 'Tents', icon: '⛺', labels: ['tent'] },
+  { id: 'furniture', name: 'Furniture', icon: '\u{1FA91}', labels: ['table', 'bench', 'stool', 'chair', 'bed', 'camp bed', 'straw bed', 'bedroll', 'throne'] },
+  { id: 'supplies', name: 'Supplies', icon: '\u{1F4E6}', labels: ['barrel', 'crate', 'sack', 'chest', 'bucket', 'basket', 'pot', 'cauldron', 'firewood', 'quiver', 'ammunition'] },
+  { id: 'fire', name: 'Fire & light', icon: '\u{1F525}', labels: ['campfire', 'brazier', 'lantern', 'torch', 'lamp post'] },
+  { id: 'weapons', name: 'Weapons & training', icon: '⚔️', labels: ['sword', 'shield', 'axe', 'mace', 'spear', 'polearm', 'crossbow', 'bow', 'warhammer', 'weapon rack', 'archery target', 'dummy'] },
+  { id: 'rugs', name: 'Rugs & ground', icon: '\u{1F9F6}', labels: ['rug', 'fur', 'groundsheet'] },
+  { id: 'wagons', name: 'Wagons & animals', icon: '\u{1F40E}', labels: ['wagon', 'wheel', 'horse'] },
+  { id: 'buildings', name: 'Buildings & decor', icon: '\u{1F3DB}️', labels: ['well', 'statue', 'tomb', 'altar', 'column', 'fountain', 'ruin', 'sign', 'stall', 'banner', 'anvil', 'forge', 'pillory', 'gallows', 'cage', 'iron maiden'] },
+  { id: 'remains', name: 'Remains', icon: '\u{1F480}', labels: ['corpse', 'debris'] },
+];
+const CAT_DEFAULT = 'buildings';
+const CAT_OF = new Map(CATEGORIES.flatMap(c => c.labels.map(l => [l, c.id])));
+const catWarned = new Set();
+function catOf(m) {
+  const c = CAT_OF.get(m.label); if (c) return c;
+  if (!catWarned.has(m.label)) { catWarned.add(m.label); console.warn(`Camp 3D: model label "${m.label}" has no category, shown under Buildings & decor`); }
+  return CAT_DEFAULT;
+}
+// any error shows in the status line: the viewer hides the page's console
+addEventListener('error', e => { const s = $('status'); if (s) { s.textContent = 'Error: ' + (e.message || e.error); s.className = 'status warn'; } });
+addEventListener('unhandledrejection', e => { const s = $('status'); if (s) { s.textContent = 'Error: ' + (e.reason && (e.reason.message || e.reason)); s.className = 'status warn'; } });
+// pixels per metre in the game, per map (Map panel > Game scale). BG's characters are fixed-size sprites, so this sets
+// how big every object looks next to them; the reference people (Show BG people) are drawn at their real pixel size
+const PXM_DEFAULT = 42; let PXM = PXM_DEFAULT;
+const ELEV = 38 * Math.PI / 180;
+// map size in BG tiles (64 px); everything metric follows from it (setMapSize)
+let TILES = [40, 30], MAP_PX, W, D, MASK, GROUND_PX, PXM_G;
+function sizesFor(t) {
+  const px = [t[0] * 64, t[1] * 64], w = px[0] / PXM, d = px[1] / (PXM * Math.sin(ELEV));
+  const g = Math.min(48, 4096 / Math.max(w, d));             // ground canvas pixels per metre (capped for big maps)
+  return { px, w, d, mask: [Math.round(w * 12), Math.round(d * 12)], gpx: [Math.round(w * g), Math.round(d * g)], g };
+}
+let CELL = [1, 1];   // one search-map cell (16 x 12 px) in metres
+function setSizeVars(t) { const z = sizesFor(t); TILES = t; MAP_PX = z.px; W = z.w; D = z.d; MASK = z.mask; GROUND_PX = z.gpx; PXM_G = z.g; CELL = [16 / PXM, 12 / (PXM * Math.sin(ELEV))]; }
+setSizeVars(TILES);
+const GROUNDS = [
+  { id: 'aerial_grass_rock', name: 'Grass' }, { id: 'forest_ground_04', name: 'Forest floor' }, { id: 'forest_leaves_02', name: 'Leaves' },
+  { id: 'brown_mud_leaves_01', name: 'Mud' }, { id: 'dirt', name: 'Dirt path' }, { id: 'dry_riverbed_rock', name: 'Stones' },
+  // added later: new layers go at the end, so the masks already saved keep their index
+  { id: 'grass_ground', name: 'Dry grass' }, { id: 'forrest_ground_01', name: 'Grass & twigs' }, { id: 'grass_path_2', name: 'Grass path' },
+  { id: 'forrest_ground_03', name: 'Pine needles' }, { id: 'leaves_forest_ground', name: 'Leaf litter' }, { id: 'dry_decay_leaves', name: 'Dead leaves' },
+  { id: 'brown_mud_dry', name: 'Dry mud' }, { id: 'red_dirt_mud_01', name: 'Red dirt' }, { id: 'sandy_gravel_02', name: 'Sandy gravel' },
+  { id: 'gravel_ground_01', name: 'Gravel' }, { id: 'rocky_trail', name: 'Rocky trail' }, { id: 'burned_ground_01', name: 'Burnt ground' },
+  { id: 'snow_02', name: 'Snow' },
+  // Acifer's textures, rebuilt from BG's own areas (non-commercial fan content only; credited): `px` = drawn at the
+  // game's pixel density, one image = px / PXM metres, whatever the map's scale
+  { id: 'acifer_BG_Grass03', name: 'BG grass', px: 512 }, { id: 'acifer_BG_Grass05', name: 'BG grass 2', px: 512 },
+  { id: 'acifer_grass03', name: 'BG meadow', px: 512 }, { id: 'acifer_bg-ground_01', name: 'BG ground', px: 512 },
+  { id: 'acifer_BG2_floor_01', name: 'BG2 earth', px: 512 }, { id: 'acifer_BG2_floor_02', name: 'BG2 earth 2', px: 512 },
+  { id: 'acifer_BG-Cobbles_01', name: 'BG cobbles', px: 256 }, { id: 'acifer_BG_Rock01', name: 'BG rock', px: 1024 },
+  { id: 'acifer_BG-Rocks_05', name: 'BG rocks', px: 512 }, { id: 'acifer_BG_Water01', name: 'BG water', px: 512 }];
+// metres covered by one image of a layer
+const texM = i => GROUNDS[i].px ? GROUNDS[i].px / PXM : TEX_M;
+// per-layer colour: hue (degrees), saturation, brightness, contrast; the same CSS filter maths in tools/render_scene.py
+const ADJ0 = { h: 0, s: 1, b: 1, c: 1 };
+let adj = GROUNDS.map(() => ({ ...ADJ0 }));
+const cssFilter = a => `hue-rotate(${a.h}deg) saturate(${a.s}) brightness(${a.b}) contrast(${a.c})`;
+const TEX_M = 4;            // one texture tile covers 4 m
+
+let M = {}, S = { items: [], spots: {}, exits: [], time: 14 }, db = null, mapDoc = null, groundDoc = null, reqDoc = null, canWrite = true;
+let mapId = 'camp3d', maps = [{ id: 'camp3d', name: 'Camp', tiles: [40, 30] }], indexDoc = null;
+const renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // PCF honours shadow.radius: soft edges like BG's
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0e0c09);
+const hemi = new THREE.HemisphereLight(0xb8c6d8, 0x4a3f2c, 0.55); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1d8, 1.6); sun.castShadow = true;
+// shadow frame fitted to the map and a tight depth range: with the old 1..200 range the bias shifted every shadow
+// ~10 cm off its object, so objects seemed to float and sank "before touching" the ground
+sun.shadow.mapSize.set(4096, 4096); Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 40, far: 130 });
+sun.shadow.radius = 4; sun.shadow.bias = -0.00005; sun.shadow.normalBias = 0.004; sun.target.position.set(W / 2, 0, D / 2); scene.add(sun, sun.target);
+
+/* ---------- cameras ---------- */
+const camBG = new THREE.OrthographicCamera(-W / 2, W / 2, 16, -16, 0.1, 500);
+function placeBG() {
+  const r = 120, c = new THREE.Vector3(W / 2, 0, D / 2);
+  camBG.position.set(c.x, r * Math.sin(ELEV), c.z + r * Math.cos(ELEV)); camBG.lookAt(c);
+  camBG.zoom = camBG.zoom || 1; fitBG();
+}
+function fitBG() {
+  const el = $('cv'), a = el.clientWidth / Math.max(1, el.clientHeight), h = MAP_PX[1] / PXM;
+  const w = Math.max(W, h * a), hh = w / a;
+  camBG.left = -w / 2; camBG.right = w / 2; camBG.top = hh / 2; camBG.bottom = -hh / 2; camBG.updateProjectionMatrix();
+}
+const camFree = new THREE.PerspectiveCamera(45, 1, 0.1, 1000); camFree.position.set(W / 2, 30, D + 25);
+let cam = camBG;
+const orbit = new THREE.OrbitControls(camFree, $('cv')); orbit.target.set(W / 2, 0, D / 2);
+orbit.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }; orbit.enabled = false;
+// BG view: wheel zooms, middle drag pans (the camera's angle never changes)
+let panBG = null;
+$('cv').addEventListener('wheel', e => {
+  if (cam !== camBG) return; e.preventDefault();
+  // zoom towards the cursor: the ground point under it stays put
+  const before = hit(e, [groundNow()]);
+  camBG.zoom = Math.min(8, Math.max(0.2, camBG.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); camBG.updateProjectionMatrix();
+  const after = hit(e, [groundNow()]);
+  if (before && after) camBG.position.add(before.point.sub(after.point));
+}, { passive: false });
+$('cv').addEventListener('pointerdown', e => { if (cam === camBG && e.button === 1) { panBG = { x: e.clientX, y: e.clientY, p: camBG.position.clone() }; e.preventDefault(); } });
+addEventListener('pointermove', e => {
+  if (!panBG) return;
+  const k = (camBG.right - camBG.left) / camBG.zoom / $('cv').clientWidth;
+  const right = new THREE.Vector3(1, 0, 0), up = new THREE.Vector3(0, Math.cos(ELEV), -Math.sin(ELEV));
+  camBG.position.copy(panBG.p).addScaledVector(right, -(e.clientX - panBG.x) * k).addScaledVector(up, (e.clientY - panBG.y) * k);
+});
+addEventListener('pointerup', () => panBG = null);
+// BG view: trees show their BG-angle sprite; the side cards stay only to cast shadows. Free view: the cards.
+const treeMats = { sprite: new Set(), cards: new Set() };
+// what the sky alone gave the sprites before BG's sun faced them: day / night
+const spriteTint = () => new THREE.Color(S.time < 6.5 || S.time > 20.5 ? 0x1c2030 : 0x80878f);
+function applyTreeView() {
+  const bg = cam === camBG;
+  for (const m of treeMats.sprite) m.visible = bg;
+  for (const m of treeMats.cards) { m.colorWrite = !bg; m.depthWrite = !bg; }
+}
+function setView(free) {
+  cam = free ? camFree : camBG; orbit.enabled = free; tc.camera = cam; applyTreeView(); if (typeof gizmoMode === 'function') gizmoMode();
+  $('vBG').classList.toggle('on', !free); $('vFree').classList.toggle('on', free);
+}
+$('vBG').onclick = () => setView(false); $('vFree').onclick = () => setView(true);
+
+/* ---------- ground: tiled textures composited through painted masks ---------- */
+const groundCv = document.createElement('canvas'); groundCv.width = GROUND_PX[0]; groundCv.height = GROUND_PX[1];
+const gctx = groundCv.getContext('2d');
+const groundTex = new THREE.CanvasTexture(groundCv); groundTex.encoding = THREE.sRGBEncoding; groundTex.anisotropy = 8;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1, color: 0xa89a86 }));
+ground.rotation.x = -Math.PI / 2; ground.position.set(W / 2, 0, D / 2); ground.receiveShadow = true; scene.add(ground);
+const board = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x2f2a20, roughness: 1 }));
+board.rotation.x = -Math.PI / 2; board.receiveShadow = true; board.visible = false; scene.add(board);   // Calibrate mode's floor
+const groundNow = () => board.visible ? board : ground;
+const border = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.01, D)), new THREE.LineBasicMaterial({ color: 0xd9a441 }));
+border.position.set(W / 2, 0.02, D / 2); scene.add(border);
+const masks = GROUNDS.map(() => { const c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1]; return c; });
+const patterns = [];
+let layer = 4, maskDirty = false, dirtyLayers = new Set(), layerUsed = GROUNDS.map((g, i) => i === 0);   // the dirt path first: grass is already everywhere
+function loadImg(src) { return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; }); }
+// Seeded random, so the ground looks the same at every visit
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const BOMB_M = 10;                        // a texture is rebuilt into a 10 m tile of shuffled patches
+function bombTile(img, i) {
+  // "texture bombing": the photo laid once, then dozens of soft round patches cut from it at random spots, turned and
+  // flipped at random and scattered over the tile (wrapping at its edges), so no 4 m grid shows any more
+  const src = texM(i) * PXM_G, size = Math.round(src * Math.max(1, Math.round(BOMB_M / texM(i))));
+  const t = document.createElement('canvas'); t.width = t.height = size; const c = t.getContext('2d');
+  const base = document.createElement('canvas'); base.width = base.height = Math.round(size / Math.max(1, Math.round(BOMB_M / texM(i))));
+  { const bc = base.getContext('2d'); bc.filter = cssFilter(adj[i] || ADJ0); bc.drawImage(img, 0, 0, base.width, base.height); }
+  c.fillStyle = c.createPattern(base, 'repeat'); c.fillRect(0, 0, size, size);
+  const p = document.createElement('canvas'), pc = p.getContext('2d');
+  for (let n = 0; n < 70; n++) {
+    const d = Math.round((1.6 + rnd() * 1.8) * PXM_G); p.width = p.height = d;
+    pc.save(); pc.translate(d / 2, d / 2); pc.rotate(rnd() * Math.PI * 2); if (rnd() < 0.5) pc.scale(-1, 1);
+    // a random spot of the photo, at the ground's own scale
+    pc.translate(-rnd() * src, -rnd() * src); pc.fillStyle = pc.createPattern(base, 'repeat'); pc.fillRect(-d, -d, d * 2 + src, d * 2 + src);
+    pc.restore();
+    pc.globalCompositeOperation = 'destination-in';
+    const g = pc.createRadialGradient(d / 2, d / 2, d * 0.15, d / 2, d / 2, d / 2); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    pc.fillStyle = g; pc.fillRect(0, 0, d, d); pc.globalCompositeOperation = 'source-over';
+    const x = rnd() * size - d / 2, y = rnd() * size - d / 2;
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) c.drawImage(p, x + ox, y + oy);
+  }
+  return t;
+}
+// large-scale light / dark / dry variation over the whole map, like real ground (two octaves of smooth noise)
+const macro = document.createElement('canvas'); macro.width = GROUND_PX[0]; macro.height = GROUND_PX[1];
+function buildMacro() {
+  const m = macro.getContext('2d'); m.fillStyle = '#808080'; m.fillRect(0, 0, macro.width, macro.height);
+  for (const [cells, alpha] of [[7, 0.55], [22, 0.3]]) {
+    const n = document.createElement('canvas'); n.width = cells; n.height = Math.round(cells * D / W); const nc = n.getContext('2d');
+    const im = nc.createImageData(n.width, n.height);
+    for (let i = 0; i < im.data.length; i += 4) { const v = 128 + (rnd() - 0.5) * 120; im.data[i] = v + 6; im.data[i + 1] = v; im.data[i + 2] = v - 10; im.data[i + 3] = 255; }
+    nc.putImageData(im, 0, 0);
+    m.globalAlpha = alpha; m.imageSmoothingEnabled = true; m.imageSmoothingQuality = 'high'; m.drawImage(n, 0, 0, macro.width, macro.height);
+  }
+  m.globalAlpha = 1;
+}
+let groundImgs = [];
+// each layer has its own seed: rebuilding one (colour change) leaves the others as they were
+function buildPattern(i) { seed = 7 + i * 7919; patterns[i] = gctx.createPattern(bombTile(groundImgs[i], i), 'repeat'); }
+function buildPatterns() { groundImgs.forEach((im, i) => buildPattern(i)); seed = 7; buildMacro(); }
+// a new map size: ground mesh, border, canvases, light and cameras follow; `keep` maps the old masks into the new ones
+function setMapSize(t, keep) {
+  const old = { W, D, masks: masks.map(m => { const c = document.createElement('canvas'); c.width = m.width; c.height = m.height; c.getContext('2d').drawImage(m, 0, 0); return c; }) };
+  setSizeVars(t);
+  ground.geometry.dispose(); ground.geometry = new THREE.PlaneGeometry(W, D); ground.position.set(W / 2, 0, D / 2);
+  border.geometry.dispose(); border.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.01, D)); border.position.set(W / 2, 0.02, D / 2);
+  groundCv.width = GROUND_PX[0]; groundCv.height = GROUND_PX[1]; macro.width = GROUND_PX[0]; macro.height = GROUND_PX[1];
+  groundTex.dispose(); groundTex.image = groundCv; groundTex.needsUpdate = true;
+  masks.forEach((m, i) => {
+    m.width = MASK[0]; m.height = MASK[1]; const c = m.getContext('2d');
+    if (i === 0) { c.fillStyle = '#fff'; c.fillRect(0, 0, MASK[0], MASK[1]); }   // new ground starts as grass
+    if (keep) c.drawImage(old.masks[i], keep.ox * 12, keep.oz * 12, old.W * 12, old.D * 12);
+  });
+  const ext = Math.max(W, D) * 0.75 + 4;
+  Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext }); sun.shadow.camera.updateProjectionMatrix();
+  sun.target.position.set(W / 2, 0, D / 2); setTime(S.time);
+  orbit.target.set(W / 2, 0, D / 2); camFree.position.set(W / 2, 30, D + 25);
+  if (groundImgs.length) buildPatterns();
+  compose(0, 0, GROUND_PX[0], GROUND_PX[1]); camBG.zoom = 1; placeBG();
+  $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera 38°`;
+}
+async function loadGround() {
+  groundImgs = await Promise.all(GROUNDS.map(g => loadImg(`tex/${g.id}.jpg`)));
+  buildPatterns();
+  const base = masks[0].getContext('2d'); base.fillStyle = '#fff'; base.fillRect(0, 0, MASK[0], MASK[1]);   // grass everywhere at first
+  compose(0, 0, GROUND_PX[0], GROUND_PX[1]);
+  const sw = $('swatches');
+  GROUNDS.forEach((g, i) => {
+    const b = document.createElement('button'); b.className = 'sw' + (i === layer ? ' on' : ''); b.style.backgroundImage = `url(tex/${g.id}.jpg)`; b.textContent = g.name;
+    b.onclick = () => { layer = i; [...sw.children].forEach((c, j) => c.classList.toggle('on', j === i)); showAdj(); }; sw.appendChild(b);
+  });
+  showAdj();
+}
+const tmp = document.createElement('canvas');
+function compose(x, y, w, h) {
+  // each layer: its texture, kept where its mask is painted, stacked in order (later layers on top)
+  x = Math.max(0, Math.floor(x)); y = Math.max(0, Math.floor(y)); w = Math.min(GROUND_PX[0] - x, Math.ceil(w)); h = Math.min(GROUND_PX[1] - y, Math.ceil(h));
+  if (w <= 0 || h <= 0) return;
+  tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
+  gctx.save(); gctx.beginPath(); gctx.rect(x, y, w, h); gctx.clip(); gctx.fillStyle = '#5a5236'; gctx.fillRect(x, y, w, h); gctx.restore();
+  const kx = MASK[0] / GROUND_PX[0], ky = MASK[1] / GROUND_PX[1];
+  masks.forEach((m, i) => {
+    if (!patterns[i] || !layerUsed[i]) return;
+    t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h);
+    t.save(); t.translate(-x, -y); t.fillStyle = patterns[i]; t.fillRect(x, y, w, h); t.restore();
+    t.globalCompositeOperation = 'destination-in'; t.imageSmoothingEnabled = true;
+    t.drawImage(m, x * kx, y * ky, w * kx, h * ky, 0, 0, w, h);
+    gctx.drawImage(tmp, x, y);
+  });
+  gctx.save(); gctx.globalCompositeOperation = 'overlay'; gctx.globalAlpha = 0.7;
+  gctx.drawImage(macro, x, y, w, h, x, y, w, h); gctx.restore();
+  groundTex.needsUpdate = true;
+}
+function paintAt(pt) {
+  const r = +$('bSize').value, a = +$('bStr').value;
+  const mx = pt.x / W * MASK[0], my = pt.z / D * MASK[1], mr = r / W * MASK[0];
+  const c = masks[layer].getContext('2d'); layerUsed[layer] = true;
+  // a soft core plus small jittered dabs, so a painted edge is ragged like a real path, not a clean circle
+  const dab = (x, y, r, al) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(255,255,255,${al})`); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
+  dab(mx, my, mr * 0.8, a);
+  for (let n = 0; n < 10; n++) { const an = Math.random() * 6.283, d = mr * (0.4 + Math.random() * 0.6); dab(mx + Math.cos(an) * d, my + Math.sin(an) * d, mr * (0.15 + Math.random() * 0.3), a * 0.8); }
+  // painting a layer also lightens the layers above it, so the new one shows through
+  for (let i = layer + 1; i < masks.length; i++) {
+    const o = masks[i].getContext('2d'); o.save(); o.globalCompositeOperation = 'destination-out';
+    const g2 = o.createRadialGradient(mx, my, 0, mx, my, mr); g2.addColorStop(0, `rgba(0,0,0,${a})`); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    o.fillStyle = g2; o.beginPath(); o.arc(mx, my, mr, 0, Math.PI * 2); o.fill(); o.restore();
+  }
+  const gx = pt.x / W * GROUND_PX[0], gy = pt.z / D * GROUND_PX[1], gr = r / W * GROUND_PX[0] + 2;
+  compose(gx - gr, gy - gr, gr * 2, gr * 2); for (let i = layer; i < masks.length; i++) dirtyLayers.add(i); maskDirty = true; changedGround();
+}
+
+/* ---------- ground colour per layer ---------- */
+const ADJ_IN = { aH: 'h', aS: 's', aB: 'b', aC: 'c' };
+function showAdj() {
+  const a = adj[layer] || ADJ0; $('adjT').textContent = 'Colour: ' + GROUNDS[layer].name;
+  for (const [id, k] of Object.entries(ADJ_IN)) { $(id).value = a[k]; $(id + 'L').textContent = k === 'h' ? a[k] + '°' : (+a[k]).toFixed(2); }
+  [...$('swatches').children].forEach((c, j) => c.style.filter = cssFilter(adj[j] || ADJ0));
+}
+let adjT = null;
+function adjChanged() {
+  // rebuilding a layer's tile takes a few tens of ms: wait for the slider to settle a little
+  clearTimeout(adjT); const i = layer;
+  adjT = setTimeout(() => { buildPattern(i); compose(0, 0, GROUND_PX[0], GROUND_PX[1]); maskDirty = true; changedGround(); }, 120);
+}
+for (const [id, k] of Object.entries(ADJ_IN)) $(id).addEventListener('input', () => { adj[layer][k] = +$(id).value; showAdj(); adjChanged(); });
+$('aReset').onclick = () => { adj[layer] = { ...ADJ0 }; showAdj(); adjChanged(); };
+
+/* ---------- game scale, and BG's people at their real size ---------- */
+$('pxm').addEventListener('input', () => { $('pxmL').textContent = $('pxm').value + ' px/m'; $('pxmApply').hidden = +$('pxm').value === PXM; });
+// nothing changes until Apply: a stray drag of the slider once rebuilt a whole map
+$('pxmApply').onclick = () => {
+  const p = +$('pxm').value; $('pxmApply').hidden = true; if (p === PXM) return;
+  // the ground keeps its size in metres: the tile count follows the new scale
+  PXM = p; const t = [Math.max(10, Math.round(W * PXM / 64)), Math.max(8, Math.round(D * PXM * Math.sin(ELEV) / 64))];
+  setMapSize(t, { ox: 0, oz: 0 });
+  const info = maps.find(m => m.id === mapId); if (info) info.tiles = t; fillMapSel(); saveIndex();
+  if (walkPlane.visible) refreshWalk(); walkDirty = true; changedWalk();
+  drawPeople(); for (const o of objs) applyScale(o.node, o.it); markAllLayers(); changed(); changedGround();
+  toast(`${PXM} px/m: map now ${t[0]}×${t[1]} tiles`);
+};
+// sprite height in game pixels (feet to top of the head) and body width next to a human's
+const PEOPLE = { human: { px: 72, w: 1, col: '#3d5a8c' }, female: { px: 68, w: 0.92, col: '#7a3d5a' }, elf: { px: 68, w: 0.88, col: '#3d7a4a' },
+  dwarf: { px: 52, w: 1.15, col: '#8c5a2e' }, halfling: { px: 44, w: 0.9, col: '#6a7a2e' } };
+const personTex = {};
+function personCanvas(kind) {
+  if (personTex[kind]) return personTex[kind];
+  const P = PEOPLE[kind], H = 256, Wd = 128, c = document.createElement('canvas'); c.width = Wd; c.height = H; const g = c.getContext('2d');
+  const k = H / 7.4, cx = Wd / 2, bw = P.w;   // a body 7.4 heads tall, stretched to the kind's height
+  g.lineJoin = 'round'; g.strokeStyle = '#120e09'; g.lineWidth = 5;
+  const shape = (fill, f) => { g.beginPath(); f(); g.fillStyle = fill; g.fill(); g.stroke(); };
+  shape('#2a2018', () => { g.moveTo(cx - 0.62 * k * bw, 3.9 * k); g.lineTo(cx - 0.55 * k * bw, H - 4); g.lineTo(cx - 0.08 * k, H - 4); g.lineTo(cx, 4.3 * k); g.lineTo(cx + 0.08 * k, H - 4); g.lineTo(cx + 0.55 * k * bw, H - 4); g.lineTo(cx + 0.62 * k * bw, 3.9 * k); g.closePath(); });
+  shape(P.col, () => { g.moveTo(cx - 0.95 * k * bw, 1.55 * k); g.lineTo(cx + 0.95 * k * bw, 1.55 * k); g.lineTo(cx + 0.75 * k * bw, 4.4 * k); g.lineTo(cx - 0.75 * k * bw, 4.4 * k); g.closePath(); });
+  shape(P.col, () => { g.moveTo(cx - 0.95 * k * bw, 1.6 * k); g.lineTo(cx - 1.25 * k * bw, 4.1 * k); g.lineTo(cx - 0.95 * k * bw, 4.2 * k); g.lineTo(cx - 0.72 * k * bw, 2.2 * k); g.closePath(); });
+  shape(P.col, () => { g.moveTo(cx + 0.95 * k * bw, 1.6 * k); g.lineTo(cx + 1.25 * k * bw, 4.1 * k); g.lineTo(cx + 0.95 * k * bw, 4.2 * k); g.lineTo(cx + 0.72 * k * bw, 2.2 * k); g.closePath(); });
+  shape('#c99a74', () => g.ellipse(cx, 0.78 * k, 0.48 * k, 0.62 * k, 0, 0, Math.PI * 2));
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return (personTex[kind] = t);
+}
+const peopleGroup = new THREE.Group(); scene.add(peopleGroup);
+function person(kind, x, z) {
+  // a cut-out facing BG's camera (tilted back 38°), its sprite's height in game pixels, on BG's green circle
+  const P = PEOPLE[kind], h = P.px / PXM, w = h / 2;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: personCanvas(kind), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
+  m.rotation.x = -ELEV; m.position.set(x, Math.cos(ELEV) * h / 2 + 0.02, z - Math.sin(ELEV) * h / 2); m.renderOrder = 7;
+  const r = 16 / PXM * (kind === 'dwarf' || kind === 'halfling' ? 0.8 : 1);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.86, r, 40), new THREE.MeshBasicMaterial({ color: 0x3cff5a, depthTest: false, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.04, z); ring.renderOrder = 7;
+  peopleGroup.add(m, ring);
+}
+function drawPeople() {
+  peopleGroup.clear(); if (!$('people').checked) return;
+  for (const [k, sp] of Object.entries(S.spots)) {
+    if (k === 'ENTRY') { ['human', 'female', 'elf', 'dwarf', 'halfling', 'human'].forEach((kind, i) => person(kind, sp.p[0] + (i % 3 - 1) * 1.1, sp.p[1] + (i < 3 ? -0.5 : 0.7))); continue; }
+    if (k === 'FIRE' || k === 'NECRO_CENTER') continue;
+    person(k === 'RECRUIT' ? 'dwarf' : 'human', sp.p[0], sp.p[1]);
+  }
+  if (!S.spots.ENTRY) ['human', 'elf', 'dwarf', 'halfling'].forEach((kind, i) => person(kind, W / 2 + (i - 1.5) * 1.2, D / 2));
+}
+$('people').onchange = () => { drawPeople(); try { localStorage.setItem('map3d.people', $('people').checked ? '1' : ''); } catch {} };
+try { $('people').checked = localStorage.getItem('map3d.people') !== ''; } catch {}
+
+/* ---------- models ---------- */
+// GLTFLoader reads embedded textures with fetch(blob:) through ImageBitmapLoader, which the page's security policy
+// blocks; without createImageBitmap it falls back to TextureLoader (<img src="blob:">), which is allowed
+try { window.createImageBitmap = undefined; } catch {}
+const loader = new THREE.GLTFLoader(), proto = {}, loading = {};
+function getModel(id) {
+  if (proto[id]) return Promise.resolve(proto[id]);
+  // The models are glTF JSON with the binary inlined as base64 (artifacts serve no .glb). The loader would fetch()
+  // that data: URI, which the page's security policy blocks, so rebuild the GLB container here and parse it.
+  if (!loading[id]) loading[id] = fetch(`models/${id}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(js => new Promise((ok, no) => {
+    const uri = js.buffers && js.buffers[0] && js.buffers[0].uri;
+    let bin = new Uint8Array(0);
+    if (uri && uri.startsWith('data:')) {
+      const s = atob(uri.slice(uri.indexOf(',') + 1)); bin = new Uint8Array(s.length);
+      for (let i = 0; i < s.length; i++) bin[i] = s.charCodeAt(i);
+      delete js.buffers[0].uri;
+    }
+    const pad = n => (4 - n % 4) % 4;
+    let jb = new TextEncoder().encode(JSON.stringify(js)); const jl = jb.length + pad(jb.length), bl = bin.length + pad(bin.length);
+    const out = new Uint8Array(12 + 8 + jl + (bin.length ? 8 + bl : 0)), dv = new DataView(out.buffer);
+    dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.length, true);
+    dv.setUint32(12, jl, true); dv.setUint32(16, 0x4E4F534A, true); out.fill(0x20, 20, 20 + jl); out.set(jb, 20);
+    if (bin.length) { const o = 20 + jl; dv.setUint32(o, bl, true); dv.setUint32(o + 4, 0x004E4942, true); out.set(bin, o + 8); }
+    loader.parse(out.buffer, '', g => {
+      g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material) { o.material.side = THREE.DoubleSide; o.material.shadowSide = THREE.DoubleSide; if (o.material.map) o.material.alphaTest = o.material.transparent ? 0.4 : o.material.alphaTest; } } });
+      // trees: "sprite" = the tree seen from BG's camera, "cards" = crossed side views (shadows, free view)
+      g.scene.traverse(o => { if (o.isMesh && (o.name === 'bgtree' || o.name === 'bgshadow')) { o.castShadow = false; o.receiveShadow = false;
+                                if (o.name === 'bgshadow') { o.material.depthWrite = false; o.renderOrder = 1; } }
+                              if (o.isMesh && o.name === 'sprite') { o.castShadow = false; o.receiveShadow = false;
+                                // the sprite is the tree already lit at BG's angle: unlit, only tinted by the time of day
+                                // (BG's sun shines on its face; lit again it went far too bright)
+                                const m0 = o.material; o.material = new THREE.MeshBasicMaterial({ map: m0.map, alphaTest: m0.alphaTest || 0.4, transparent: m0.transparent, side: THREE.DoubleSide, color: spriteTint() });
+                                treeMats.sprite.add(o.material); }
+                              if (o.isMesh && o.name === 'cards') treeMats.cards.add(o.material); });
+      applyTreeView();
+      proto[id] = g.scene; ok(g.scene);
+    }, no);
+  })).catch(e => { delete loading[id]; toast(`Model ${id} failed to load`); throw e; });
+  return loading[id];
+}
+const objs = [];             // { it: saved item, node: Object3D }
+const root = new THREE.Group(); scene.add(root);
+async function spawn(it) {
+  if (it.m === 'flame') {
+    const n = new THREE.Object3D(); n.userData.item = it; n.position.fromArray(it.p);
+    const o = { it, node: n, sprite: null }; refreshFlame(o); root.add(n); objs.push(o); return o;
+  }
+  const p = await getModel(it.m).catch(() => null); if (!p) return null;
+  const n = p.clone(); n.userData.item = it;
+  n.position.fromArray(it.p); n.quaternion.fromArray(it.q || [0, 0, 0, 1]); applyScale(n, it);
+  // a tree's BG-view sprite must keep facing the camera whatever the tree's turn (loop() undoes the turn on it)
+  const o = { it, node: n, sprite: n.children.find(c => c.name === 'sprite' || c.name === 'bgsprite') || null };
+  applyHeight(o); applyCanvas(o); applyCol(o); root.add(n); objs.push(o); return o;
+}
+// size: uniform `s`, times an optional per-axis `sz` (tents: width, height, depth)
+function applyScale(n, it) {
+  if (it.m === 'flame') { n.scale.set(1, 1, 1); return; } const z = it.sz || [1, 1, 1], s = (it.s || 1) * (M[it.m] && M[it.m].px ? PXM_DEFAULT / PXM : 1); n.scale.set(s * z[0], s * z[1], s * z[2]); }
+
+/* ---------- a piece's own colour (item.col = {h, s, b, c}): the ground's CSS filter maths, in the piece's shader; the
+   twin of render_map.py's recolour group ---------- */
+function hueMat(deg) {
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  return new THREE.Matrix3().set(0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928,
+    0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283,
+    0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072);
+}
+function satMat(v) {
+  return new THREE.Matrix3().set(0.213 + 0.787 * v, 0.715 - 0.715 * v, 0.072 - 0.072 * v, 0.213 - 0.213 * v, 0.715 + 0.285 * v, 0.072 - 0.072 * v,
+    0.213 - 0.213 * v, 0.715 - 0.715 * v, 0.072 + 0.928 * v);
+}
+const isPlain = c => !c || (!c.h && c.s === 1 && c.b === 1 && c.c === 1);
+function applyCol(o) {
+  const c = o.it.col;
+  o.node.traverse(m => {
+    if (!m.isMesh || !m.material || m.name === 'bgshadow') return;
+    if (!m.userData.base) m.userData.base = m.material;
+    const base = m.userData.base;
+    if (isPlain(c)) { if (m.material !== base) { if (m.material.map) base.map = m.material.map; m.material = base; } return; }
+    if (m.material === base) {
+      const mat = base.clone(), u = { uHue: { value: new THREE.Matrix3() }, uSat: { value: new THREE.Matrix3() }, uB: { value: 1 }, uC: { value: 1 } };
+      mat.userData.u = u;
+      mat.onBeforeCompile = sh => {
+        Object.assign(sh.uniforms, u);
+        sh.fragmentShader = 'uniform mat3 uHue; uniform mat3 uSat; uniform float uB; uniform float uC;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+          `#include <map_fragment>
+          { vec3 k = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+            k = clamp(uHue * k, 0.0, 1.0); k = clamp(uSat * k, 0.0, 1.0); k = clamp(k * uB, 0.0, 1.0); k = clamp((k - 0.5) * uC + 0.5, 0.0, 1.0);
+            diffuseColor.rgb = pow(k, vec3(2.2)); }`);
+      };
+      mat.customProgramCacheKey = () => 'piece-colour';
+      if (treeMats.sprite.has(base)) treeMats.sprite.add(mat);
+      m.material = mat;
+    }
+    const u = m.material.userData.u;
+    u.uHue.value.copy(hueMat(c.h)); u.uSat.value.copy(satMat(c.s)); u.uB.value = c.b; u.uC.value = c.c;
+  });
+}
+const COL_IN = { oH: 'h', oS: 's', oB: 'b', oC: 'c' };
+function showCol() {
+  const c = (sel && sel.it.col) || { h: 0, s: 1, b: 1, c: 1 };
+  for (const [id, k] of Object.entries(COL_IN)) { $(id).value = c[k]; $(id + 'L').textContent = k === 'h' ? c[k] + '°' : (+c[k]).toFixed(2); }
+}
+for (const [id, k] of Object.entries(COL_IN)) $(id).addEventListener('input', () => {
+  if (!sel) return;
+  const c = sel.it.col || { h: 0, s: 1, b: 1, c: 1 }; c[k] = +$(id).value;
+  if (isPlain(c)) delete sel.it.col; else sel.it.col = c;
+  applyCol(sel); showCol(); changed();
+});
+$('oReset').onclick = () => { if (!sel) return; delete sel.it.col; applyCol(sel); showCol(); changed(); };
+
+/* ---------- tent canvas: the twin of tools/canvas.py (same parameters, same image), one texture per look ---------- */
+const grainImg = loadImg('tex/canvas_grain.jpg'), texCache = new Map();
+let grain = null;
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function motif(u, v, pat, n) {
+  if (pat === 'stripes') return Math.floor(u * n * 2) % 2 === 1;
+  if (pat === 'bands') return Math.floor(v * n * 2) % 2 === 1;
+  if (pat === 'checks') return (Math.floor(u * n * 2) + Math.floor(v * n)) % 2 === 1;
+  if (pat === 'chevrons') return Math.floor(u * n * 2 + 2 * Math.abs((v * 4) % 1 - 0.5)) % 2 === 1;
+  if (pat === 'border') return Math.abs(v - 0.46) < 0.045 || v < 0.05 || v > 0.96;
+  // rugs (u along the length, v across)
+  const b = Math.min(u, 1 - u, v, 1 - v);
+  if (pat === 'medallion') { const m = Math.abs(u - 0.5) / 0.26 + Math.abs(v - 0.5) / 0.36; return b < 0.07 || (b > 0.10 && b < 0.12) || (m < 1 && m > 0.78) || m < 0.38; }
+  if (pat === 'kilim') return Math.floor(v * n * 2 + 0.5 * Math.abs((u * n * 3) % 1 - 0.5)) % 2 === 1 || b < 0.05;
+  if (pat === 'diamonds') { const d = Math.abs((u * n) % 1 - 0.5) + Math.abs((v * n * 0.66) % 1 - 0.5); return (d < 0.28 && d > 0.14) || b < 0.06; }
+  return false;
+}
+function vnoise(u, v, cells = 12) {
+  const x = u * cells, y = v * cells, xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+  const h = (a, b) => { const t = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return t - Math.floor(t); };
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  return (h(xi, yi) * (1 - sx) + h(xi + 1, yi) * sx) * (1 - sy) + (h(xi, yi + 1) * (1 - sx) + h(xi + 1, yi + 1) * sx) * sy;
+}
+async function canvasTexture(p) {
+  const key = JSON.stringify(p); if (texCache.has(key)) return texCache.get(key);
+  const N = 512;
+  if (!grain) {
+    const im = await grainImg, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+    for (const x of [0, N / 2]) for (const y of [0, N / 2]) g.drawImage(im, x, y, N / 2, N / 2);
+    const d = g.getImageData(0, 0, N, N).data, a = new Float32Array(N * N); let m = 0;
+    for (let i = 0; i < a.length; i++) { a[i] = d[i * 4] / 255; m += a[i]; } m /= a.length;
+    let sd = 0; for (const v of a) sd += (v - m) ** 2; sd = Math.sqrt(sd / a.length);
+    grain = a.map(v => 0.72 + 0.4 * (v - m) / (sd * 3 + 1e-6) + 0.28);
+  }
+  const c1 = hexRGB(p.c1), c2 = hexRGB(p.c2), n = Math.max(1, p.n | 0), w = +p.wear;
+  const c = document.createElement('canvas'); c.width = c.height = N; const ctx = c.getContext('2d'), im = ctx.createImageData(N, N), d = im.data;
+  for (let r = 0; r < N; r++) for (let q = 0; q < N; q++) {
+    const u = (q + 0.5) / N, v = 1 - (r + 0.5) / N, col = motif(u, v, p.pat, n) ? c2 : c1, i = r * N + q;
+    // a tent gets mud and soot near the ground; a rug lies flat: no ground edge
+    let f = grain[i] * (p.rug ? 1 : 1 - w * 0.7 * Math.min(1, Math.max(0, 1 - v / 0.3))) * (1 - w * 0.4 * vnoise(u, v));
+    let R = col[0] * f, G = col[1] * f, B = col[2] * f; const gy = (R + G + B) / 3;
+    R += (gy - R) * w * 0.35; G += (gy - G) * w * 0.35; B += (gy - B) * w * 0.35;
+    d[i * 4] = R; d[i * 4 + 1] = G; d[i * 4 + 2] = B; d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+  texCache.set(key, t); return t;
+}
+const tentLook = o => o.it.tent || (M[o.it.m] && M[o.it.m].canvas);
+async function applyCanvas(o) {
+  const look = tentLook(o); if (!look) return;
+  const tex = await canvasTexture(look);
+  o.node.traverse(m => {
+    if (!m.isMesh || !m.material || !/^canvas/.test(m.material.name)) return;
+    // this tent's own look: its own copy of the uncoloured material (applyCol below recolours on top of it)
+    if (!m.userData.own) { m.material = (m.userData.base || m.material).clone(); m.userData.base = m.material; m.userData.own = true; }
+    m.material.map = tex; m.material.color.set(0xffffff); m.material.needsUpdate = true;
+  });
+  applyCol(o);
+}
+/* ---------- per-model height corrections (Calibrate mode), saved in models/offsets, applied everywhere ---------- */
+let heights = {}, offsetsDoc = null, calib = null;
+function applyHeight(o) {
+  // the model's parts sit `heights[id]` metres higher (or lower) inside its node; the node stays on the ground
+  const off = (heights[o.it.m] || 0) - ((M[o.it.m] && M[o.it.m].sink) || 0);
+  for (const c of o.node.children) { if (c.userData.y0 === undefined) c.userData.y0 = c.position.y; c.position.y = c.userData.y0 + off; }
+}
+async function startCalib() {
+  if (calib) return endCalib();
+  const g = $('group').value, ids = Object.keys(M).filter(id => !g || M[id].group === g);
+  calib = { items: S.items, objs: objs.splice(0) };
+  for (const o of calib.objs) root.remove(o.node);
+  select(null);
+  // one of each model in rows, spaced by their size, all at height 0 so the correction shows as their height
+  // on a board of its own, much larger than the map: rows 60 m wide centred on the map
+  const X0 = W / 2 - 30, X1 = W / 2 + 30;
+  S.items = []; let x = X0, z = D / 2 - 25, row = 0;
+  for (const id of ids) {
+    const d = M[id].dims, s = ['tree', 'conifer'].includes(M[id].label) ? 0.6 : 1, w = Math.max(d[0], d[1]) * s;
+    if (x + w > X1) { x = X0; z += row + 1.5; row = 0; }
+    // heights are in the model's own metres (scaled with the piece)
+    S.items.push({ m: id, p: [x + w / 2, (heights[id] || 0) * s, z], q: [0, 0, 0, 1], s }); x += w + 1; row = Math.max(row, w);
+  }
+  await Promise.all(S.items.map(async it => { const o = await spawn(it); if (o) { o.calibrating = true; for (const c of o.node.children) c.position.y = c.userData.y0; } }));
+  // frame the rows: BG camera centred on them, zoomed so they fill the view
+  const zs = S.items.map(i => i.p[2]), z0 = Math.min(...zs) - 8, z1 = Math.max(...zs) + 8, cz = (z0 + z1) / 2;
+  board.geometry.dispose(); board.geometry = new THREE.PlaneGeometry(X1 - X0 + 12, z1 - z0);
+  board.position.set(W / 2, 0, cz); board.visible = true; ground.visible = false; border.visible = false;
+  Object.assign(sun.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90 }); sun.shadow.camera.updateProjectionMatrix();
+  setView(false); placeBG(); camBG.position.z += cz - D / 2;
+  camBG.zoom = 0.95 * Math.min((camBG.right - camBG.left) / (X1 - X0 + 12), (camBG.top - camBG.bottom) / ((z1 - z0) * Math.sin(ELEV) + 8));
+  camBG.updateProjectionMatrix();
+  $('calib').classList.add('on'); $('calibSave').hidden = false; setTool('sel'); mode('translate');
+  toast('Calibrate: raise or lower each model with ▲ so it sits on the ground, then Save heights');
+}
+function endCalib() {
+  for (const o of objs.splice(0)) root.remove(o.node);
+  S.items = calib.items; for (const o of calib.objs) { applyHeight(o); root.add(o.node); objs.push(o); }
+  board.visible = false; ground.visible = true; border.visible = true;
+  Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36 }); sun.shadow.camera.updateProjectionMatrix();
+  calib = null; $('calib').classList.remove('on'); $('calibSave').hidden = true; select(null); placeBG();
+}
+async function saveCalib() {
+  if (!calib) return;
+  for (const o of objs) { const y = +(o.node.position.y / o.node.scale.x).toFixed(3); if (y) heights[o.it.m] = y; else delete heights[o.it.m]; }
+  if (offsetsDoc && canWrite) {
+    try { await offsetsDoc.set({ offsets: heights, updated: new Date().toISOString() }); toast(`Heights saved (${Object.keys(heights).length} models)`); }
+    catch { toast('Could not save the heights'); return; }
+  } else toast('Heights kept for this visit only (not signed in)');
+  endCalib();
+}
+function sync(o) {
+  o.it.p = o.node.position.toArray().map(v => +v.toFixed(3)); o.it.q = o.node.quaternion.toArray().map(v => +v.toFixed(5));
+  if (o.it.m !== 'flame') o.it.s = +(o.node.scale.y / ((o.it.sz && o.it.sz[1]) || 1)).toFixed(3);
+  if (o.it.m === 'flame') {
+    // the engine cannot scale an animation: the piece's scale picks the small, medium or large camp fire instead
+    o.node.position.y = 0; o.it.p[1] = 0;
+    if (Math.abs(o.node.scale.y - 1) > 1e-3) { o.it.s = +((o.it.s || 1) * o.node.scale.y).toFixed(2); o.node.scale.set(1, 1, 1); setFlameSize(o); }
+    fireSpotFromFlames(); drawCamp();
+  }
+}
+// the game's camp-fire flames as pieces of the map (it.m 'flame', it.bam the animation): placed, moved, duplicated,
+// deleted and undone like any piece. Their scale only picks the size (BG cannot scale an animation)
+const FIRE_SIZE = { FPIT1S: 0.6, FPIT1M: 1.0, FPIT1L: 1.5 };
+const sizeBam = s => s < 0.8 ? 'FPIT1S' : s < 1.3 ? 'FPIT1M' : 'FPIT1L';
+function refreshFlame(o) { for (const c of o.node.children.slice()) o.node.remove(c); o.node.add(flame(o.it.bam || 'FPIT1L', 0, 0)); }
+function setFlameSize(o) { o.it.bam = sizeBam(o.it.s || 1); refreshFlame(o); if (sel === o) showSel(); }
+// the Campfire spot (the camp's Lua: where people gather) stays on the first flame
+function fireSpotFromFlames() {
+  const f = S.items.find(it => it.m === 'flame'); if (!f) return;
+  S.spots.FIRE = { ...(S.spots.FIRE || { f: 0 }), p: [+f.p[0].toFixed(2), +f.p[2].toFixed(2)] }; delete S.spots.FIRE.bam;
+}
+$('selFlame').onchange = () => {
+  if (!sel || sel.it.m !== 'flame') return; const v = $('selFlame').value;
+  if (!v) { del(); return; }
+  sel.it.bam = v; sel.it.s = FIRE_SIZE[v]; refreshFlame(sel); showSel(); changed();
+};
+function restOnGround(o) {
+  if (o.it.m === 'flame') return;
+  if (M[o.it.m] && M[o.it.m].px) { o.node.position.y = 0; sync(o); return; }
+  const b = new THREE.Box3().setFromObject(o.node); o.node.position.y -= b.min.y; sync(o);
+}
+
+/* ---------- selection and gizmo ---------- */
+const tc = new THREE.TransformControls(cam, $('cv')); scene.add(tc);
+tc.addEventListener('dragging-changed', e => { orbit.enabled = cam === camFree && !e.value; if (!e.value && sel) { sync(sel); changed(); } });
+tc.addEventListener('objectChange', () => { if (sel) { sync(sel); showSel(); } });
+let sel = null, tool = 'sel', placing = null, pickCycle = null;
+function select(o) {
+  sel = o; if (o) tc.attach(o.node); else tc.detach(); showSel(); gizmoMode();
+}
+// BG view + Move: the BG camera looks down 38°, so three's up and depth arrows fall on the same screen line. Our own
+// handles instead: ▲ height, ▼ depth, ▶ left/right, ✥ slide on the ground.
+const giz = $('giz');
+function bgMove() { return cam === camBG && tc.getMode() === 'translate' && sel; }
+function gizmoMode() { const on = !!bgMove(); giz.hidden = !on; tc.enabled = !on; tc.visible = !on && !!sel; }
+function placeGizmo() {
+  if (giz.hidden || !sel) return;
+  const v = sel.node.position.clone().project(cam), el = $('cv');
+  giz.style.left = ((v.x + 1) / 2 * el.clientWidth) + 'px'; giz.style.top = ((1 - v.y) / 2 * el.clientHeight) + 'px';
+}
+let gdrag = null;
+giz.addEventListener('pointerdown', e => {
+  const ax = e.target.dataset && e.target.dataset.ax; if (!ax || !sel) return;
+  e.preventDefault(); e.target.setPointerCapture(e.pointerId);
+  gdrag = { ax, x: e.clientX, y: e.clientY, p: sel.node.position.clone(), h: hit(e, [groundNow()]) };
+});
+giz.addEventListener('pointermove', e => {
+  if (!gdrag) return;
+  const ppm = $('cv').clientWidth / ((camBG.right - camBG.left) / camBG.zoom);   // screen pixels per metre
+  const dx = (e.clientX - gdrag.x) / ppm, dy = (e.clientY - gdrag.y) / ppm, p = gdrag.p, n = sel.node.position;
+  if (gdrag.ax === 'x') n.x = p.x + dx;
+  else if (gdrag.ax === 'y') n.y = Math.max(-5, p.y - dy / Math.cos(ELEV));   // up on screen = up in the world
+  else if (gdrag.ax === 'z') n.z = p.z + dy / Math.sin(ELEV);                  // down on screen = towards the camera
+  else { const h = hit(e, [groundNow()]); if (h && gdrag.h) { n.x = p.x + h.point.x - gdrag.h.point.x; n.z = p.z + h.point.z - gdrag.h.point.z; } }
+  sync(sel); showSel();
+});
+giz.addEventListener('pointerup', () => { if (gdrag) { gdrag = null; changed(); } });
+function showSel() {
+  $('selName').textContent = sel ? (sel.it.m === 'flame' ? 'Camp fire flame (game animation)' : `${M[sel.it.m]?.name || M[sel.it.m]?.label || sel.it.m} · ${sel.it.m}`) : 'Nothing selected';
+  if (sel) { $('scl').value = sel.it.s || 1; $('sclL').textContent = (+(sel.it.s || 1)).toFixed(2); }
+  showCol();
+  $('flameBox').hidden = !(sel && sel.it.m === 'flame');
+  if (sel && sel.it.m === 'flame') $('selFlame').value = sel.it.bam || 'FPIT1L';
+  const look = sel && tentLook(sel); $('tentBox').hidden = !look;
+  if (look) {
+    $('tc1').value = look.c1; $('tc2').value = look.c2; $('tpat').value = look.pat; $('tn').value = look.n; $('tnL').textContent = look.n; $('tw').value = look.wear;
+    const z = sel.it.sz || [1, 1, 1]; $('tsx').value = z[0]; $('tsy').value = z[1]; $('tsz').value = z[2];
+  }
+}
+function editTent() {
+  if (!sel || !tentLook(sel)) return;
+  const prev = tentLook(sel);   // a rug stays a rug (no ground edge on its cloth)
+  sel.it.tent = { c1: $('tc1').value, c2: $('tc2').value, pat: $('tpat').value, n: +$('tn').value, wear: +$('tw').value, ...(prev && prev.rug ? { rug: 1 } : {}) };
+  $('tnL').textContent = $('tn').value; applyCanvas(sel); changed();
+}
+function editSize() {
+  if (!sel) return; sel.it.sz = [+$('tsx').value, +$('tsy').value, +$('tsz').value]; applyScale(sel.node, sel.it); restOnGround(sel); changed();
+}
+['tc1', 'tc2', 'tpat', 'tn', 'tw'].forEach(id => $(id).addEventListener('input', editTent));
+['tsx', 'tsy', 'tsz'].forEach(id => $(id).addEventListener('input', editSize));
+function mode(m) { tc.setMode(m); ['mMove', 'mRot', 'mScale'].forEach((b, i) => $(b).classList.toggle('on', ['translate', 'rotate', 'scale'][i] === m)); gizmoMode(); }
+$('mMove').onclick = () => mode('translate'); $('mRot').onclick = () => mode('rotate'); $('mScale').onclick = () => mode('scale');
+$('ground').onclick = () => { if (sel) { restOnGround(sel); changed(); } };
+document.querySelectorAll('[data-turn]').forEach(b => b.onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), +b.dataset.turn * Math.PI / 180); sync(sel); changed(); });
+$('layX').onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI / 2); restOnGround(sel); changed(); };
+$('layZ').onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2); restOnGround(sel); changed(); };
+$('scl').oninput = () => { if (!sel) return; sel.it.s = +$('scl').value; applyScale(sel.node, sel.it); $('sclL').textContent = (+$('scl').value).toFixed(2); if (sel.it.m === 'flame') setFlameSize(sel); restOnGround(sel); changed(); };
+async function dup() { if (!sel) return; const it = JSON.parse(JSON.stringify(sel.it)); it.p[0] += 1; it.p[2] += 1; S.items.push(it); const o = await spawn(it); select(o); changed(); }
+function del() {
+  if (!sel) return; root.remove(sel.node); objs.splice(objs.indexOf(sel), 1); S.items.splice(S.items.indexOf(sel.it), 1); select(null); changed(); }
+$('dup').onclick = dup; $('del').onclick = del;
+// shortcuts work everywhere except while typing (a slider or a button keeps the focus after use: it must not block them)
+const typing = t => (t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'color'].includes(t.type)) || t.tagName === 'TEXTAREA';
+addEventListener('keydown', e => {
+  if (typing(e.target)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'w') mode('translate'); else if (k === 'e') mode('rotate'); else if (k === 'r') mode('scale');
+  else if (k === 'g' && sel) { restOnGround(sel); changed(); }
+  else if (k === 'q') setTool('sel');
+  else if ((k === 'delete' || k === 'backspace') && sel) del();
+  else if (k === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dup(); }
+  else if (k === 'escape') { placing = null; [...$('tray').children].forEach(c => c.classList.remove('pick')); select(null); }
+});
+function setTool(t) {
+  tool = t; ['tSel', 'tPaint', 'tTrees', 'tCamp', 'tWalk'].forEach((b, i) => $(b).classList.toggle('on', ['sel', 'paint', 'trees', 'camp', 'walk'][i] === t));
+  $('selBox').hidden = t !== 'sel'; $('paintBox').hidden = t !== 'paint'; $('treeBox').hidden = t !== 'trees';
+  $('campBox').hidden = t !== 'camp'; $('walkBox').hidden = t !== 'walk';
+  if (typeof walkPlane !== 'undefined') { walkPlane.visible = t === 'walk' || t === 'camp'; if (walkPlane.visible) refreshWalk(); }
+  if (t !== 'sel') select(null);
+}
+$('tCamp').onclick = () => setTool('camp'); $('tWalk').onclick = () => setTool('walk');
+$('tSel').onclick = () => setTool('sel'); $('tPaint').onclick = () => setTool('paint'); $('tTrees').onclick = () => setTool('trees');
+
+/* ---------- pointer on the ground ---------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function hit(e, targets) {
+  const r = $('cv').getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, cam); return ray.intersectObjects(targets, true)[0] || null;
+}
+let stroke = null;
+$('cv').addEventListener('pointerdown', async e => {
+  if (e.button !== 0 || tc.dragging || e.altKey) return;
+  if (tool === 'sel' && placing) {
+    const h = hit(e, [groundNow()]); if (!h) return;
+    const it = { m: placing, p: [h.point.x, 0, h.point.z], q: [0, 0, 0, 1], s: 1 }; S.items.push(it);
+    const o = await spawn(it); if (o) { restOnGround(o); select(o); changed(); }
+    if (!e.shiftKey) { placing = null; [...$('tray').children].forEach(c => c.classList.remove('pick')); }
+    return;
+  }
+  if (tool === 'sel') {
+    // every piece under the cursor, nearest first; clicking the same spot again picks the next one down (stacked pieces)
+    const r = $('cv').getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(ndc, cam);
+    const under = [];
+    // the camp fire's flame is drawn over its pit and is bigger than it: a click on the flame picks the pit first
+    for (const h of ray.intersectObjects(root.children, true)) { let n = h.object; while (n.parent !== root) n = n.parent; const o = objs.find(o => o.node === n); if (o && !under.includes(o)) under.push(o); }
+    // a flame is drawn over everything: when the ray crosses one, it is the first pick
+    under.sort((a, b) => (b.it.m === 'flame') - (a.it.m === 'flame'));
+    if (under.length) {
+      const again = pickCycle && Math.hypot(e.clientX - pickCycle.x, e.clientY - pickCycle.y) < 6 && under.includes(sel);
+      const o = again ? under[(under.findIndex(u => u === sel) + 1) % under.length] : under[0];
+      pickCycle = { x: e.clientX, y: e.clientY }; select(o);
+      if (under.length > 1) toast(`${o.it.m === 'flame' ? 'Camp fire flame' : M[o.it.m]?.name || M[o.it.m]?.label || o.it.m} (${under.indexOf(o) + 1}/${under.length}): click again for the one below`);
+    } else if (!tc.axis) select(null);
+    return;
+  }
+  if (tool === 'camp') {
+    const h = hit(e, [groundNow()]); if (!h) return;
+    if (exitDrawing) { exitDrawing = { a: h.point.clone(), b: h.point.clone() }; $('cv').setPointerCapture(e.pointerId); return; }
+    // grab a person (or the fire's spot) where they stand and drag them; the list + click still works
+    if (!spotPick) {
+      let best = null, bd = 1.4;
+      // (the camp fire is not dragged here: it follows its fire pit)
+      for (const [k] of SPOTS) { const sp = S.spots[k]; if (!sp || (k === 'FIRE' && spotset === 'camp')) continue; const d = Math.hypot(sp.p[0] - h.point.x, sp.p[1] - h.point.z); if (d < bd) { bd = d; best = k; } }
+      if (best) { dragSpot = best; $('cv').setPointerCapture(e.pointerId); return; }
+    }
+    if (spotPick) { const old = S.spots[spotPick]; S.spots[spotPick] = { p: [+h.point.x.toFixed(2), +h.point.z.toFixed(2)], f: +$('spotFace').value, ...(old && old.bam ? { bam: old.bam } : {}) }; drawCamp(); changed(); }
+    return;
+  }
+  stroke = { last: null }; $('cv').setPointerCapture(e.pointerId); strokeAt(e);
+});
+$('cv').addEventListener('pointermove', e => {
+  if (dragSpot) { const h = hit(e, [groundNow()]); if (h) { S.spots[dragSpot].p = [+h.point.x.toFixed(2), +h.point.z.toFixed(2)]; drawCamp(); } return; }
+  if (!exitDrawing || !exitDrawing.a) return;
+  const h = hit(e, [groundNow()]); if (h) { exitDrawing.b = h.point.clone(); drawCamp(exitDrawing); }
+});
+$('cv').addEventListener('pointerup', () => {
+  if (dragSpot) { dragSpot = null; changed(); return; }
+  if (!exitDrawing || !exitDrawing.a) return;
+  const { a, b } = exitDrawing; exitDrawing = null; $('exitDraw').classList.remove('on');
+  const x0 = Math.max(0, Math.min(a.x, b.x)), x1 = Math.min(W, Math.max(a.x, b.x)), z0 = Math.max(0, Math.min(a.z, b.z)), z1 = Math.min(D, Math.max(a.z, b.z));
+  if (x1 - x0 > 0.3 && z1 - z0 > 0.3) { S.exits.push({ pts: [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(q => q.map(v => +v.toFixed(2))) }); changed(); }
+  drawCamp();
+});
+$('cv').addEventListener('pointermove', e => { if (stroke) strokeAt(e); moveBrushRing(e); });
+// brush preview: a ring on the ground under the cursor, the size of the current brush (ground paint, trees, walkable)
+const brushRing = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9, depthTest: false }));
+brushRing.rotation.x = -Math.PI / 2; brushRing.renderOrder = 12; brushRing.visible = false; scene.add(brushRing);
+const brushInput = () => ({ paint: 'bSize', trees: 'tSize', walk: 'wSize' })[tool];
+function moveBrushRing(e) {
+  const id = brushInput(); if (!id) { brushRing.visible = false; return; }
+  const h = e && hit(e, [groundNow()]); if (!h) { brushRing.visible = false; return; }
+  const r = +$(id).value; brushRing.visible = true; brushRing.position.set(h.point.x, 0.06, h.point.z); brushRing.scale.set(r, r, r);
+  $(id + 'L').textContent = r.toFixed(1) + ' m';
+}
+$('cv').addEventListener('pointerleave', () => brushRing.visible = false);
+addEventListener('keydown', e => {
+  const id = brushInput(); if (!id || e.target.tagName === 'INPUT' || (e.key !== '[' && e.key !== ']')) return;
+  const el = $(id); el.value = Math.min(+el.max, Math.max(+el.min, +el.value * (e.key === ']' ? 1.2 : 1 / 1.2)));
+  brushRing.scale.setScalar(+el.value); $(id + 'L').textContent = (+el.value).toFixed(1) + ' m';
+});
+['bSize', 'tSize', 'wSize'].forEach(id => $(id).addEventListener('input', () => { brushRing.scale.setScalar(+$(id).value); $(id + 'L').textContent = (+$(id).value).toFixed(1) + ' m'; }));
+$('cv').addEventListener('pointerup', () => { if (stroke && tool === 'trees') changed(); if (stroke && tool === 'walk') changedWalk(); stroke = null; });
+function strokeAt(e) {
+  const h = hit(e, [groundNow()]); if (!h) return;
+  if (tool === 'paint') { if (!stroke.last || stroke.last.distanceTo(h.point) > +$('bSize').value * 0.25) { paintAt(h.point); stroke.last = h.point.clone(); } }
+  else if (tool === 'trees') treeBrush(h.point);
+  else if (tool === 'walk') walkPaint(h.point);
+}
+
+/* ---------- camp: people's spots, the arrival point, exits (written to the game's ARE by tools/build_camp3d.py) ---------- */
+// spot names are the camp Lua's (SQCampSite): the priestess, the merchant, Cain, Withers and his recruits, the necromancer
+// each kind of map has its own people (map field `spotset`): the rest camp, or the Grand Merchant's ambush (quest)
+const SPOT_SETS = {
+  camp: [['ENTRY', 'Arrival point'], ['FIRE', 'Campfire'], ['PRIEST', 'Priestess'], ['MERCH', 'Merchant'], ['CAIN', 'Deckard Cain'],
+    ['WITHERS', 'Withers'], ['RECRUIT', 'Recruits'], ['NECRO', 'Necromancer'], ['NECRO_CENTER', 'Necromancer\'s dummies']],
+  ambush: [['ENTRY', 'Arrival point'], ['MERCHANT', 'Grand merchant'], ['BANDIT1', 'Bandit 1'], ['BANDIT2', 'Bandit 2 (protected)'],
+    ['BANDIT3', 'Bandit 3 (protected)'], ['BANDIT4', 'Bandit 4'], ['BROTHER', 'Younger brother'], ['FIRE', 'Bandits\' fire']] };
+let spotset = 'camp', SPOTS = SPOT_SETS.camp;
+let spotPick = null, exitDrawing = null, dragSpot = null;
+const campGroup = new THREE.Group(); scene.add(campGroup);
+const labelTex = {};
+function label(text) {
+  if (labelTex[text]) return labelTex[text];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 48; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,16,10,.8)'; g.fillRect(0, 0, 256, 48); g.fillStyle = '#ffd27a'; g.font = '600 26px Georgia'; g.textAlign = 'center'; g.fillText(text, 128, 33);
+  return (labelTex[text] = new THREE.CanvasTexture(c));
+}
+// the game's camp-fire animations (BG's FPIT1S/M/L BAMs as sprite sheets: frames side by side, every frame placed round
+// the same anchor = the animation's position point), drawn additively like the game's blended fire
+const FIRE_BAMS = { FPIT1S: { frames: 6, w: 23, h: 20, ax: 12, ay: 9 }, FPIT1M: { frames: 6, w: 48, h: 42, ax: 23, ay: 18 },
+  FPIT1L: { frames: 6, w: 78, h: 67, ax: 40, ay: 30 } };
+const fireTex = {};
+function flame(bamres, x, z) {
+  const B = FIRE_BAMS[bamres] || FIRE_BAMS.FPIT1L;
+  let t = fireTex[bamres];
+  if (!t) { t = fireTex[bamres] = new THREE.TextureLoader().load(`tex/fire_${bamres}.png`); t.encoding = THREE.sRGBEncoding; t.repeat.set(1 / B.frames, 1); t.magFilter = THREE.NearestFilter; }
+  const w = B.w / PXM, h = B.h / PXM;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+  // facing BG's camera; the anchor pixel (ax, ay) sits on the spot's ground point; drawn over the scenery, as BG draws
+  // its animations over the area
+  const dx = (B.w / 2 - B.ax) / PXM, dy = (B.ay - B.h / 2) / PXM;
+  m.rotation.x = -ELEV; m.position.set(x + dx, Math.cos(ELEV) * dy + 0.05, z - Math.sin(ELEV) * dy); m.renderOrder = 12;
+  m.userData.flame = true; return m;
+}
+function drawCamp(preview) {
+  campGroup.clear(); drawPeople();
+  for (const [k, name] of SPOTS) {
+    const sp = S.spots[k]; if (!sp) continue;
+    const g = new THREE.Group(); g.position.set(sp.p[0], 0, sp.p[1]);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 24), new THREE.MeshBasicMaterial({ color: k === 'ENTRY' ? 0x7ad0ff : 0xffd27a, side: THREE.DoubleSide, depthTest: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; ring.renderOrder = 10; g.add(ring);
+    // facing: BG's 0 south, 4 west, 8 north, 12 east -> an arrow on the ground
+    const a = sp.f / 16 * Math.PI * 2, arrow = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }));
+    arrow.position.set(-Math.sin(a) * 0.75, 0.05, Math.cos(a) * 0.75); arrow.rotation.set(Math.PI / 2, 0, 0); arrow.rotation.order = 'YXZ'; arrow.rotation.y = -a;
+    arrow.renderOrder = 10; g.add(arrow);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: label(name), depthTest: false })); sprite.scale.set(3.2, 0.6, 1); sprite.position.y = 2.2; sprite.renderOrder = 11; g.add(sprite);
+    campGroup.add(g);
+  }
+  const boxes = S.exits.map(x => x.pts);
+  if (preview && preview.a) boxes.push([[preview.a.x, preview.a.z], [preview.b.x, preview.a.z], [preview.b.x, preview.b.z], [preview.a.x, preview.b.z]]);
+  for (const pts of boxes) {
+    const sh = new THREE.Shape(pts.map(q => new THREE.Vector2(q[0], q[1])));
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthTest: false }));
+    m.rotation.x = Math.PI / 2; m.position.y = 0.04; m.renderOrder = 9; campGroup.add(m);
+  }
+  $('spotList').innerHTML = SPOTS.map(([k, n]) => `<button class="spot${spotPick === k ? ' on' : ''}" data-spot="${k}">${n}${S.spots[k] ? ' ✓' : ''}</button>`).join(' ');
+  $('spotList').querySelectorAll('[data-spot]').forEach(b => b.onclick = () => { spotPick = spotPick === b.dataset.spot ? null : b.dataset.spot; if (S.spots[spotPick]) $('spotFace').value = S.spots[spotPick].f; drawCamp(); });
+  $('exitList').innerHTML = S.exits.map((x, i) => `<div class="row">Exit ${i + 1} <button data-delexit="${i}">Delete</button></div>`).join('');
+  $('exitList').querySelectorAll('[data-delexit]').forEach(b => b.onclick = () => { S.exits.splice(+b.dataset.delexit, 1); drawCamp(); changed(); });
+}
+$('exitDraw').onclick = () => { exitDrawing = exitDrawing ? null : {}; $('exitDraw').classList.toggle('on', !!exitDrawing); spotPick = null; toast('Drag a box on the ground'); };
+$('spotFace').onchange = () => { if (spotPick && S.spots[spotPick]) { S.spots[spotPick].f = +$('spotFace').value; drawCamp(); changed(); } };
+
+/* ---------- walkable: the game's search map, 16 x 12 px cells. Automatic from the objects (same rule as
+   tools/build_camp3d.py), plus painted corrections (red = blocked, green = free) saved in maps/<id>_walk ---------- */
+const NOBLOCK = new Set(['grass', 'fern', 'moss', 'roots', 'firewood']);
+const walkCv = document.createElement('canvas'), walkFix = document.createElement('canvas');
+const walkTex = new THREE.CanvasTexture(walkCv); walkTex.magFilter = THREE.NearestFilter;
+const walkPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: walkTex, transparent: true, opacity: 0.55, depthTest: false }));
+walkPlane.rotation.x = -Math.PI / 2; walkPlane.renderOrder = 8; walkPlane.visible = false; scene.add(walkPlane);
+let walkMode = 'block', walkDoc = null, walkDirty = false, walkSaveT = null;
+function walkCells() { return [Math.round(MAP_PX[0] / 16), Math.round(MAP_PX[1] / 12)]; }
+function footprint(it) {
+  // what an object blocks on the ground: null, { circle: r } or { rect: [w, d], yaw } (metres)
+  const m = M[it.m]; if (!m) return null;
+  const s = it.s || 1, z = it.sz || [1, 1, 1], d = m.dims;
+  const w = d[0] * s * z[0], dp = d[1] * s * z[2];
+  if (NOBLOCK.has(m.label) || Math.max(w, dp) < 0.55) return null;
+  if (['tree', 'conifer', 'dead tree', 'bg tree'].includes(m.label)) return { circle: Math.max(0.35, 0.45 * s) };
+  if (m.label === 'bg grove') return { circle: 0.35 * w };
+  if (m.label === 'bush') return { circle: 0.35 * Math.max(w, dp) };
+  const q = new THREE.Quaternion().fromArray(it.q || [0, 0, 0, 1]), e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+  return { rect: [w * 0.85, dp * 0.85], yaw: e.y };
+}
+function refreshWalk() {
+  const [cw, ch] = walkCells();
+  if (walkCv.width !== cw || walkCv.height !== ch) {
+    // another scale: the corrections are resampled cell for cell (no smoothing, which blurred them into specks), then snapped
+    walkCv.width = cw; walkCv.height = ch; const f = document.createElement('canvas'); f.width = cw; f.height = ch;
+    const fc = f.getContext('2d'); fc.imageSmoothingEnabled = false; fc.drawImage(walkFix, 0, 0, cw, ch);
+    walkFix.width = cw; walkFix.height = ch; walkFix.getContext('2d').drawImage(f, 0, 0); snapWalk();
+  }
+  const g = walkCv.getContext('2d'); g.clearRect(0, 0, cw, ch); g.fillStyle = 'rgb(220,40,40)';
+  const kx = 1 / CELL[0], kz = 1 / CELL[1];
+  for (const it of S.items) {
+    const f = footprint(it); if (!f) continue;
+    g.save(); g.translate(it.p[0] * kx, it.p[2] * kz);
+    if (f.circle) { g.beginPath(); g.ellipse(0, 0, f.circle * kx, f.circle * kz, 0, 0, Math.PI * 2); g.fill(); }
+    else { g.scale(kx, kz); g.rotate(-f.yaw); g.fillRect(-f.rect[0] / 2, -f.rect[1] / 2, f.rect[0], f.rect[1]); }
+    g.restore();
+  }
+  // corrections on top: red pixels block, green ones free
+  const fix = walkFix.getContext('2d').getImageData(0, 0, cw, ch).data, out = g.getImageData(0, 0, cw, ch), o = out.data;
+  for (let i = 0; i < cw * ch; i++) {
+    if (fix[i * 4 + 3] < 128) { o[i * 4 + 3] = o[i * 4 + 3] > 0 ? 255 : 0; continue; }
+    const block = fix[i * 4] > fix[i * 4 + 1];
+    o[i * 4] = block ? 220 : 60; o[i * 4 + 1] = block ? 40 : 200; o[i * 4 + 2] = 40; o[i * 4 + 3] = block ? 255 : 90;
+  }
+  g.putImageData(out, 0, 0); walkTex.needsUpdate = true;
+  walkPlane.geometry.dispose(); walkPlane.geometry = new THREE.PlaneGeometry(W, D); walkPlane.position.set(W / 2, 0.05, D / 2);
+}
+// every correction cell is either blocked (pure red), free (pure green) or none: no half-transparent, mixed cells
+function snapWalk() {
+  const g = walkFix.getContext('2d'), im = g.getImageData(0, 0, walkFix.width, walkFix.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 128) { d[i] = d[i + 1] = d[i + 2] = d[i + 3] = 0; continue; }
+    const block = d[i] > d[i + 1]; d[i] = block ? 255 : 0; d[i + 1] = block ? 0 : 255; d[i + 2] = 0; d[i + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+}
+function walkPaint(pt) {
+  const r = +$('wSize').value, g = walkFix.getContext('2d');
+  g.save(); g.globalCompositeOperation = walkMode === 'auto' ? 'destination-out' : 'source-over';
+  g.fillStyle = walkMode === 'free' ? 'rgb(0,255,0)' : 'rgb(255,0,0)';
+  g.beginPath(); g.ellipse(pt.x / CELL[0], pt.z / CELL[1], r / CELL[0], r / CELL[1], 0, 0, Math.PI * 2); g.fill(); g.restore();
+  walkDirty = true; refreshWalk();
+}
+function walkSetMode(m) { walkMode = m; ['wBlock', 'wFree', 'wAuto'].forEach((b, i) => $(b).classList.toggle('on', ['block', 'free', 'auto'][i] === m)); }
+$('wBlock').onclick = () => walkSetMode('block'); $('wFree').onclick = () => walkSetMode('free'); $('wAuto').onclick = () => walkSetMode('auto');
+function changedWalk() { if (!walkDoc || !canWrite) return; clearTimeout(walkSaveT); walkSaveT = setTimeout(saveWalk, 1500); }
+async function saveWalk() {
+  if (!walkDirty || !walkDoc) return; walkDirty = false;
+  try { await walkDoc.set({ cells: walkCells(), fix: walkFix.toDataURL('image/png'), updated: new Date().toISOString() }); }
+  catch { walkDirty = true; status('Walkable corrections NOT saved', 'warn'); }
+}
+
+/* ---------- tree brush: scatter with a minimum spacing ---------- */
+const TREE_KINDS = ['bg tree', 'bg grove', 'conifer', 'tree', 'bush', 'dead tree', 'fern', 'grass', 'rock'];
+const treeOn = new Set(['conifer', 'tree', 'bush']);
+function buildTreeKinds() {
+  const box = $('treeKinds');
+  for (const k of TREE_KINDS) {
+    const n = Object.values(M).filter(m => m.label === k && m.group === 'nature').length; if (!n) continue;
+    const l = document.createElement('label'); l.className = 'row'; l.innerHTML = `<input type="checkbox" ${treeOn.has(k) ? 'checked' : ''}> ${k} (${n})`;
+    l.firstChild.onchange = ev => ev.target.checked ? treeOn.add(k) : treeOn.delete(k); box.appendChild(l);
+  }
+}
+function treeScale() { return +$('tScale').value; }
+$('tScale').oninput = () => $('tScaleL').textContent = (+$('tScale').value).toFixed(2);
+function treeBrush(c) {
+  const R = +$('tSize').value, gap = +$('tGap').value;
+  const isTree = o => M[o.it.m] && M[o.it.m].group === 'nature' && o.it.brush;
+  if ($('tErase').checked) {
+    for (const o of objs.filter(o => isTree(o) && Math.hypot(o.node.position.x - c.x, o.node.position.z - c.z) < R)) {
+      root.remove(o.node); objs.splice(objs.indexOf(o), 1); S.items.splice(S.items.indexOf(o.it), 1);
+    }
+    return;
+  }
+  const pool = Object.keys(M).filter(id => M[id].group === 'nature' && treeOn.has(M[id].label)); if (!pool.length) return;
+  for (let t = 0; t < 6; t++) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * R, x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+    if (x < 0 || z < 0 || x > W || z > D) continue;
+    if (objs.some(o => Math.hypot(o.node.position.x - x, o.node.position.z - z) < gap)) continue;
+    const it = { m: pool[Math.floor(Math.random() * pool.length)], p: [x, 0, z], q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6.283).toArray(), s: +((0.8 + Math.random() * 0.45) * treeScale()).toFixed(2), brush: 1 };
+    if (M[it.m].px) it.s = +(0.9 + Math.random() * 0.2).toFixed(2);
+    S.items.push(it); spawn(it);
+  }
+}
+
+/* ---------- time of day ---------- */
+const SUN_DIR = new THREE.Vector3(-0.61, 0, 0.79).normalize().multiplyScalar(Math.cos(Math.PI / 4)).setY(Math.sin(Math.PI / 4));
+// every fire, brazier, lantern and torch lights its surroundings: strongly at night, a faint halo by day (the twin of
+// render_map.py's fire lights). [share of the piece's height, intensity, reach in metres]
+const FIRES = { campfire: [0.4, 18, 14], brazier: [0.9, 9, 10], forge: [0.8, 9, 10], torch: [0.85, 5, 7], lantern: [0.7, 3, 5], 'lamp post': [0.9, 4, 8] };
+const fireGroup = new THREE.Group(); scene.add(fireGroup);
+function refreshFires(night) {
+  fireGroup.clear(); const k = night ? 1 : 0.12;
+  for (const o of objs.slice()) {
+    const m = M[o.it.m], f = m && FIRES[m.label]; if (!f || fireGroup.children.length >= 16) continue;
+    const s = o.it.s || 1, l = new THREE.PointLight(0xff9a4a, f[1] * k, f[2] * s, 2);
+    l.position.set(o.node.position.x, o.node.position.y + f[0] * m.dims[2] * s, o.node.position.z); fireGroup.add(l);
+  }
+}
+function setTime(h) {
+  S.time = h; const isNight = h < 6.5 || h > 20.5; $('tDay').classList.toggle('on', !isNight); $('tNight').classList.toggle('on', isNight);
+  // BG's own light, measured on BG1's trees: shadows run up-right on screen at ~38°, as long as the tree is tall, so
+  // the sun stands south-west at 45°. It stays there all day (the moon too); the hour only sets colour and strength
+  const day = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+  sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 80);
+  const night = h < 6.5 || h > 20.5; refreshFires(night);
+  for (const m of treeMats.sprite) m.color.copy(spriteTint());
+  sun.intensity = night ? 0.25 : 0.4 + day * 1.4; sun.color.set(night ? 0x8fa6d8 : day < 0.35 ? 0xffb070 : 0xfff1d8);
+  hemi.intensity = night ? 0.18 : 0.35 + day * 0.3; hemi.color.set(night ? 0x34406a : 0xb8c6d8);
+}
+// day and night only: BG's daylight never moves, so the hour is just 14:00 or 22:00 (the export renders both)
+$('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () => { setTime(22); changed(); };
+
+/* ---------- tray ---------- */
+// tray filters: category (icon buttons, by object type), place (#group, the model's group) and the search box
+let trayCat = null;
+function buildTray() {
+  const groups = [...new Set(Object.values(M).filter(m => !m.notray).map(m => m.group))].sort();
+  $('group').innerHTML = `<option value="">All places</option>` + groups.map(g => `<option value="${g}">${g} (${Object.values(M).filter(m => !m.notray && m.group === g).length})</option>`).join('');
+  $('cats').innerHTML = '';
+  for (const c of CATEGORIES) {
+    const b = document.createElement('button'); b.dataset.cat = c.id; b.textContent = c.icon;
+    b.onclick = () => { trayCat = trayCat === c.id ? null : c.id; fillTray(); $('tray').scrollTop = 0; };
+    $('cats').appendChild(b);
+  }
+  $('group').onchange = $('search').oninput = () => { fillTray(); $('tray').scrollTop = 0; }; fillTray();
+}
+function fillTray() {
+  const g = $('group').value, q = $('search').value.toLowerCase(), tray = $('tray'); tray.innerHTML = '';
+  // category counts follow the place filter
+  const counts = {}; for (const m of Object.values(M)) if (!m.notray && (!g || m.group === g)) { const c = catOf(m); counts[c] = (counts[c] || 0) + 1; }
+  for (const b of $('cats').children) {
+    const c = CATEGORIES.find(x => x.id === b.dataset.cat), n = counts[c.id] || 0;
+    b.title = `${c.name} (${n})${trayCat === c.id ? ': click again for all' : ''}`; b.classList.toggle('on', trayCat === c.id); b.disabled = !n && trayCat !== c.id;
+  }
+  for (const [id, m] of Object.entries(M)) {
+    if (m.notray || (g && m.group !== g)) continue; if (trayCat && catOf(m) !== trayCat) continue;
+    if (q && !(m.label + ' ' + (m.name || '') + ' ' + id).toLowerCase().includes(q)) continue;
+    const b = document.createElement('button'); b.className = 'tile' + (placing === id ? ' pick' : '');
+    b.title = `${m.name ? m.name + ' · ' : ''}${m.label} · ${m.dims.map(v => v.toFixed(1)).join(' × ')} m · ${id}`;
+    // one atlas for every thumbnail (tools/thumb_atlas.py: 16 columns of 96 px cells, drawn here at 58 px)
+    b.innerHTML = `<i class="th" style="background-position:${-(m.ti % 16) * 58}px ${-Math.floor(m.ti / 16) * 58}px"></i><span>${m.name || m.label}</span>`;
+    b.onclick = () => { placing = id; setTool('sel'); select(null); [...tray.children].forEach(c => c.classList.toggle('pick', c === b)); getModel(id); toast('Click the ground to place it (Shift: keep placing)'); };
+    tray.appendChild(b);
+  }
+  if (!tray.children.length) tray.innerHTML = '<div class="hint" style="grid-column:1/-1">No object matches these filters.</div>';
+}
+function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = 'none', 2500); }
+
+/* ---------- saving ---------- */
+function status(t, k) { const s = $('status'); s.textContent = t; s.className = 'status' + (k ? ' ' + k : ''); }
+let saveT = null, saving = false, dirty = false, gSaveT = null, gSaving = false;
+// undo / redo: the map's pieces, people, exits and light after each change (not the painted ground or walkable cells)
+let hist = [], hpos = -1, restoring = false;
+const snapState = () => JSON.stringify({ items: S.items, spots: S.spots, exits: S.exits, time: S.time });
+function histReset() { hist = [snapState()]; hpos = 0; }
+async function histGo(d) {
+  const i = hpos + d; if (i < 0 || i >= hist.length || restoring) return;
+  restoring = true; const st = JSON.parse(hist[i]);
+  select(null); for (const o of objs.splice(0)) root.remove(o.node);
+  S.items = st.items; S.spots = st.spots; S.exits = st.exits;
+  await Promise.all(S.items.map(spawn)); setTime(st.time); drawCamp(); if (walkPlane.visible) refreshWalk();
+  hpos = i; changed(); restoring = false;
+  toast(d < 0 ? `Undone (${hpos} more back)` : `Redone (${hist.length - 1 - hpos} more ahead)`);
+}
+$('undo').onclick = () => histGo(-1); $('redo').onclick = () => histGo(1);
+addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || typing(e.target)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); histGo(-1); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); histGo(1); }
+});
+function changed() {
+  // calibration rows are not part of the map
+  if (calib || !mapDoc || !canWrite) return;
+  if (!restoring) {
+    const st = snapState();
+    if (st !== hist[hpos]) { hist = hist.slice(0, hpos + 1); hist.push(st); if (hist.length > 60) hist.shift(); hpos = hist.length - 1; }
+  }
+  dirty = true; status('Unsaved…'); clearTimeout(saveT); saveT = setTimeout(save, 1200);
+}
+async function save() {
+  if (saving || !dirty) return; saving = true; dirty = false; status('Saving…');
+  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: 38, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
+  catch (e) { status(e && e.code === 'permission_denied' ? 'View only: changes are not kept' : 'Save failed, will retry', 'warn'); if (e && e.code === 'permission_denied') canWrite = false; }
+  saving = false; if (dirty) save();
+}
+function changedGround() { if (!groundDoc || !canWrite) return; status('Ground: unsaved…', 'warn'); clearTimeout(gSaveT); gSaveT = setTimeout(saveGround, 1000); }
+// The ground is saved one layer per document (maps/<id>_g<n>, WebP): six PNG masks in one document went past the
+// database's size limit on big maps and every save after the first failed. Only the changed layers are written.
+function markAllLayers() { masks.forEach((m, i) => dirtyLayers.add(i)); maskDirty = true; }
+async function saveGround() {
+  if (gSaving || !maskDirty || !groundDoc) return; gSaving = true; maskDirty = false;
+  const todo = [...dirtyLayers]; dirtyLayers.clear();
+  try {
+    for (const i of todo) await db.doc(`maps/${mapId}_g${i}`).set({ layer: GROUNDS[i].id, mask: masks[i].toDataURL('image/webp', 0.92), size: MASK, updated: new Date().toISOString() });
+    await groundDoc.set({ layers: GROUNDS.map(g => g.id), tex_m: TEX_M, tex_m_by: Object.fromEntries(GROUNDS.map((g, i) => [g.id, +texM(i).toFixed(3)])), split: true, mask_size: MASK, adj: Object.fromEntries(GROUNDS.map((g, i) => [g.id, adj[i]]).filter(([, a]) => a.h || a.s !== 1 || a.b !== 1 || a.c !== 1)), updated: new Date().toISOString() });
+    status('Saved', 'ok');
+  } catch (e) {
+    todo.forEach(i => dirtyLayers.add(i)); maskDirty = true;
+    status('Ground NOT saved: ' + ((e && (e.code || e.message)) || 'error'), 'warn'); toast('The painted ground could not be saved; it will retry');
+    clearTimeout(gSaveT); gSaveT = setTimeout(saveGround, 8000);
+  }
+  gSaving = false;
+}
+// leaving or reloading the page: write what is still pending right away
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (dirty) save(); if (maskDirty) saveGround(); if (walkDirty) saveWalk(); } });
+addEventListener('pagehide', () => { if (dirty) save(); if (maskDirty) saveGround(); });
+// Save: everything pending, now, with a clear answer
+$('saveNow').onclick = async () => {
+  if (!db) { toast('Not signed in: nothing can be saved'); return; }
+  clearTimeout(saveT); clearTimeout(gSaveT);
+  dirty = true; markAllLayers(); walkDirty = true;
+  await save(); await saveGround(); await saveWalk();
+  const ok = !dirty && !maskDirty && !walkDirty;
+  toast(ok ? 'Saved: map, ground and walkable' : 'Something could not be saved: see the status line'); if (ok) status('Saved', 'ok');
+};
+$('calib').onclick = startCalib; $('calibSave').onclick = saveCalib;
+$('preview').onclick = async () => {
+  if (!reqDoc) { toast('Saving is off: preview needs it'); return; }
+  const c = cam === camBG ? camBG : null;
+  const view = c ? { x: c.position.x, y: c.position.y, z: c.position.z, zoom: c.zoom } : null;
+  try { await save(); await saveGround(); await reqDoc.set({ kind: 'preview', time: S.time, view, asked: new Date().toISOString(), done: false }); toast('Preview asked: tell Claude in the chat'); }
+  catch { toast('Could not send the request'); }
+};
+// the database hands back read-only (frozen) documents: editing them fails without a word, so a moved piece kept its
+// old place in the next save (only new or duplicated pieces, built here, were editable). Everything kept and edited
+// is our own copy
+const own = v => JSON.parse(JSON.stringify(v));
+async function connect() {
+  let use = null; try { use = await claude.use('db'); } catch {}
+  db = use; if (!db) { status('Not saved: sign in to keep the map', 'warn'); return; }
+  reqDoc = db.doc('requests/preview'); offsetsDoc = db.doc('models/offsets'); indexDoc = db.doc('maps/_index');
+  const t = setTimeout(() => status('Saving is slow to answer', 'warn'), 10000);
+  try {
+    const [isnap, osnap] = await Promise.all([indexDoc.get(), offsetsDoc.get()]); clearTimeout(t);
+    if (isnap.exists && (isnap.data().maps || []).length) maps = own(isnap.data().maps);
+    if (osnap.exists) { heights = own(osnap.data().offsets || {}); }
+    let last = null; try { last = localStorage.getItem('map3d.map'); } catch {}
+    fillMapSel(); await openMap(maps.some(m => m.id === last) ? last : maps[0].id);
+    try { const u = await claude.use('user'); const w = u ? await u.can('data.write') : null; if (w === false) canWrite = false; } catch {}
+    status(canWrite ? 'Saved' : 'View only', canWrite ? 'ok' : 'warn');
+  } catch (e) { clearTimeout(t); status('Could not load the saved map', 'warn'); }
+}
+
+/* ---------- several named maps: maps/_index lists them, maps/<id> + maps/<id>_ground hold each ---------- */
+function fillMapSel() { $('mapSel').innerHTML = maps.map(m => `<option value="${m.id}">${m.name} (${m.tiles[0]}×${m.tiles[1]})</option>`).join(''); $('mapSel').value = mapId; }
+async function saveIndex() { if (indexDoc && canWrite) try { await indexDoc.set({ maps, updated: new Date().toISOString() }); } catch {} }
+async function openMap(id) {
+  if (calib) endCalib();
+  clearTimeout(saveT); clearTimeout(gSaveT); if (dirty) await save(); if (maskDirty) await saveGround();
+  select(null); for (const o of objs.splice(0)) root.remove(o.node);
+  mapId = id; try { localStorage.setItem('map3d.map', id); } catch {}
+  const info = maps.find(m => m.id === id) || { tiles: [40, 30] };
+  mapDoc = db.doc('maps/' + id); groundDoc = db.doc('maps/' + id + '_ground');
+  const [snap, gsnap] = await Promise.all([mapDoc.get(), groundDoc.get()]);
+  const d = snap.exists ? own(snap.data()) : {};
+  // maps saved at another scale keep their size in metres: their tile count follows (60 -> 42 px/m: 80x60 -> 56x42)
+  let tiles = d.tiles || info.tiles;
+  // each map keeps its own scale; the first maps were made at 60 px/m and move to the default, keeping their size in metres
+  PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
+  if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
+  $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m';
+  layerUsed = GROUNDS.map((g, i) => i === 0);
+  adj = GROUNDS.map(g => ({ ...ADJ0, ...((gsnap.exists && gsnap.data().adj) || {})[g.id] }));
+  setMapSize(tiles); showAdj();
+  S.items = (d.items || []).filter(i => M[i.m]); setTime(d.time ?? 14);
+  S.spots = d.spots || {}; S.exits = d.exits || [];
+  spotset = SPOT_SETS[d.spotset] ? d.spotset : 'camp'; SPOTS = SPOT_SETS[spotset];
+  walkDoc = db.doc('maps/' + id + '_walk');
+  { const wsnap = await walkDoc.get(); const [cw, ch] = walkCells(); walkFix.width = cw; walkFix.height = ch;
+    if (wsnap.exists && wsnap.data().fix) { const im = await loadImg(wsnap.data().fix); const wc = walkFix.getContext('2d'); wc.imageSmoothingEnabled = false; wc.drawImage(im, 0, 0, cw, ch); snapWalk(); walkDirty = true; changedWalk(); } }
+  drawCamp(); if (walkPlane.visible) refreshWalk();
+  await Promise.all(S.items.map(spawn));
+  if (spotset === 'camp' && S.spots.FIRE && S.spots.FIRE.bam !== 'none' && !S.items.some(it => it.m === 'flame')) {
+    const sp = S.spots.FIRE, bam = sp.bam || 'FPIT1L', it = { m: 'flame', p: [sp.p[0], 0, sp.p[1]], q: [0, 0, 0, 1], s: FIRE_SIZE[bam] || 1.5, bam };
+    S.items.push(it); await spawn(it); fireSpotFromFlames(); drawCamp(); dirty = true;
+  }
+  setTime(S.time); histReset();
+  if (gsnap.exists) {
+    const g = gsnap.data();
+    // split layers (current) or the older single document with every mask
+    const urls = g.split ? await Promise.all(GROUNDS.map(async (x, i) => { const d = await db.doc(`maps/${id}_g${i}`).get(); return d.exists ? d.data().mask : null; })) : (g.masks || []);
+    layerUsed = GROUNDS.map((g, i) => i === 0 || !!urls[i]);
+    await Promise.all(urls.map(async (u, i) => { if (!masks[i] || !u) return; const im = await loadImg(u); const c = masks[i].getContext('2d'); c.clearRect(0, 0, MASK[0], MASK[1]); c.drawImage(im, 0, 0, MASK[0], MASK[1]); }));
+    compose(0, 0, GROUND_PX[0], GROUND_PX[1]);
+    if (!g.split) markAllLayers();   // move an old map to the split layout at the next save
+  }
+  dirtyLayers.clear(); if (gsnap.exists && !gsnap.data().split) markAllLayers(); else maskDirty = false;
+  fillMapSel();
+}
+const PRESETS = { small: [30, 22], medium: [40, 30], large: [60, 45], huge: [80, 60] };
+function sizePanel(mode) {
+  // mode 'new': name + size; 'resize': size + which sides grow
+  const p = $('mapPanel'); p.hidden = false; p.dataset.mode = mode;
+  $('mpNameRow').hidden = mode !== 'new'; $('mpSides').hidden = mode !== 'resize';
+  $('mpTitle').textContent = mode === 'new' ? 'New map' : 'Resize this map';
+  $('mpW').value = TILES[0]; $('mpH').value = TILES[1]; $('mpName').value = '';
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { const t = PRESETS[b.dataset.preset]; $('mpW').value = t[0]; $('mpH').value = t[1]; });
+$('mapNew').onclick = () => sizePanel('new'); $('mapResize').onclick = () => sizePanel('resize');
+$('mpCancel').onclick = () => $('mapPanel').hidden = true;
+$('mapSel').onchange = () => openMap($('mapSel').value);
+$('mpOk').onclick = async () => {
+  const t = [Math.max(10, Math.min(120, +$('mpW').value | 0)), Math.max(8, Math.min(120, +$('mpH').value | 0))];
+  $('mapPanel').hidden = true;
+  if ($('mapPanel').dataset.mode === 'new') {
+    if (!db) { toast('Sign in to keep several maps'); return; }
+    const name = $('mpName').value.trim() || `Map ${maps.length + 1}`;
+    const id = 'm' + Date.now().toString(36);
+    maps.push({ id, name, tiles: t }); await saveIndex();
+    await openMap(id); dirty = true; markAllLayers(); await save(); await saveGround();
+    toast(`${name}: new ${t[0]}×${t[1]} map`); return;
+  }
+  // resize: the ticked sides take the growth (or the cut); both sides of an axis = half each, none = east / south
+  const z = sizesFor(t), dw = z.w - W, dd = z.d - D;
+  const west = $('mpWest').checked, east = $('mpEast').checked, north = $('mpNorth').checked, south = $('mpSouth').checked;
+  const ox = west && east ? dw / 2 : west ? dw : 0, oz = north && south ? dd / 2 : north ? dd : 0;
+  for (const o of objs) { o.node.position.x += ox; o.node.position.z += oz; sync(o); }
+  setMapSize(t, { ox, oz });
+  const info = maps.find(m => m.id === mapId); if (info) info.tiles = t; fillMapSel(); await saveIndex();
+  markAllLayers(); changed(); changedGround();
+  toast(`Map now ${t[0]}×${t[1]} tiles`);
+};
+
+/* ---------- loop ---------- */
+function resize() {
+  const el = $('cv'), w = el.clientWidth, h = el.clientHeight; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(w, h, false);
+  camFree.aspect = w / Math.max(1, h); camFree.updateProjectionMatrix(); fitBG();
+}
+addEventListener('resize', resize);
+function loop() {
+  requestAnimationFrame(loop); if (orbit.enabled) orbit.update();
+  for (const o of objs) if (o.sprite) o.sprite.quaternion.copy(o.node.quaternion).invert();
+  const fi = Math.floor(performance.now() / 66); for (const k in fireTex) fireTex[k].offset.x = (fi % FIRE_BAMS[k].frames) / FIRE_BAMS[k].frames;
+  renderer.render(scene, cam); placeGizmo();
+}
+async function boot() {
+  M = await (await fetch('models.json')).json();
+  M.flame = { label: 'flame', name: 'Camp fire flame (game animation)', group: 'camp', dims: [1.9, 1.9, 1.6], notray: 1 };
+  placeBG(); resize(); setTime(14); buildTray(); buildTreeKinds(); setTool('sel'); loop();
+  await loadGround().catch(() => status('Ground textures missing', 'warn'));
+  setMapSize(TILES); fillMapSel();
+  status('Local only', 'warn'); connect();
+}
+boot();
+</script>

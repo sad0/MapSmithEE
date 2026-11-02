@@ -1,0 +1,9 @@
+node_modules
+/build
+/.svelte-kit
+/package
+src-tauri/target
+src-tauri/gen
+tests/shots/
+static/camp3d/models/
+static/camp3d/proxies/

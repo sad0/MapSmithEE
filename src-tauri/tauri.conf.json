@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MapSmithEE",
+  "version": "0.1.0",
+  "identifier": "com.sad0.mapsmithee",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1430",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "MapSmithEE",
+        "width": 1500,
+        "height": 920,
+        "minWidth": 900,
+        "minHeight": 560,
+        "url": "camp3d/index.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "sad0",
+    "shortDescription": "Infinity Engine area editor",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "resources": {
+      "../samples/camp3d/maps/": "samples/camp3d/maps/"
+    }
+  }
+}

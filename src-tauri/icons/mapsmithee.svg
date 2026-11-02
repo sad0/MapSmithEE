@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="parch" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1dfb4"/>
+      <stop offset="1" stop-color="#d4b67c"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9ced4"/>
+      <stop offset="0.5" stop-color="#8b939c"/>
+      <stop offset="1" stop-color="#4e555c"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a5a2b"/>
+      <stop offset="0.5" stop-color="#b07a3f"/>
+      <stop offset="1" stop-color="#6e4520"/>
+    </linearGradient>
+  </defs>
+  <!-- parchment map with rolled ends -->
+  <rect x="120" y="190" width="784" height="650" rx="40" fill="url(#parch)" stroke="#6b4a24" stroke-width="18"/>
+  <rect x="96" y="170" width="70" height="690" rx="35" fill="#c9a865" stroke="#6b4a24" stroke-width="16"/>
+  <rect x="858" y="170" width="70" height="690" rx="35" fill="#c9a865" stroke="#6b4a24" stroke-width="16"/>
+  <!-- map lines: a road and a river -->
+  <path d="M200 700 C320 640 380 560 470 560 S640 470 760 330" fill="none" stroke="#9a6b3a" stroke-width="14" stroke-dasharray="34 20" stroke-linecap="round"/>
+  <path d="M220 330 C320 380 300 470 420 500" fill="none" stroke="#5f86a3" stroke-width="12" stroke-linecap="round"/>
+  <!-- compass rose -->
+  <g transform="translate(330 330)">
+    <circle r="78" fill="none" stroke="#6b4a24" stroke-width="8"/>
+    <path d="M0 -110 L22 0 L0 110 L-22 0 Z" fill="#7b2e1e"/>
+    <path d="M-110 0 L0 22 L110 0 L0 -22 Z" fill="#6b4a24"/>
+    <circle r="12" fill="#f1dfb4" stroke="#6b4a24" stroke-width="6"/>
+  </g>
+  <!-- hammer, lying diagonally -->
+  <g transform="translate(600 610) rotate(-38)">
+    <rect x="-28" y="-40" width="56" height="400" rx="22" fill="url(#wood)" stroke="#3d2610" stroke-width="12"/>
+    <rect x="-150" y="-150" width="300" height="130" rx="20" fill="url(#steel)" stroke="#2c3036" stroke-width="14"/>
+    <rect x="-175" y="-140" width="40" height="110" rx="10" fill="#6b737b" stroke="#2c3036" stroke-width="12"/>
+    <rect x="135" y="-140" width="40" height="110" rx="10" fill="#6b737b" stroke="#2c3036" stroke-width="12"/>
+  </g>
+</svg>

@@ -1,0 +1,334 @@
+{
+ "aerial_grass_rock": {
+  "name": "Aerial Grass Rock",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "brown_mud_dry": {
+  "name": "Brown Mud Dry",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "brown_mud_leaves_01": {
+  "name": "Brown Mud Leaves 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "burned_ground_01": {
+  "name": "Burned Ground 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "canvas_grain": null,
+ "dirt": {
+  "name": "Dirt",
+  "authors": [
+   "Charlotte Baglioni"
+  ]
+ },
+ "dry_decay_leaves": {
+  "name": "Dry Decay Leaves",
+  "authors": [
+   "Amal Kumar"
+  ]
+ },
+ "dry_riverbed_rock": {
+  "name": "Dry Riverbed Rock",
+  "authors": [
+   "Amal Kumar"
+  ]
+ },
+ "forest_ground_04": {
+  "name": "Forest Ground 04",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "forest_leaves_02": {
+  "name": "Forest Leaves 02",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "forrest_ground_01": {
+  "name": "Forest Ground 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "forrest_ground_03": {
+  "name": "Forest Ground 03",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "grass_ground": {
+  "name": "Grass Ground",
+  "authors": [
+   "Charlotte Baglioni"
+  ]
+ },
+ "grass_path_2": {
+  "name": "Grass Path 2",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "gravel_ground_01": {
+  "name": "Gravel Ground 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "leaves_forest_ground": {
+  "name": "Leaves Forest Ground",
+  "authors": [
+   "Dario Barresi",
+   "Dimitrios Savva"
+  ]
+ },
+ "red_dirt_mud_01": {
+  "name": "Red Dirt Mud 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "rocky_trail": {
+  "name": "Rocky Trail",
+  "authors": [
+   "Amal Kumar"
+  ]
+ },
+ "sandy_gravel_02": {
+  "name": "Sandy Gravel 02",
+  "authors": [
+   "Dario Barresi"
+  ]
+ },
+ "snow_02": {
+  "name": "Snow 02",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "boulder_01": {
+  "name": "Boulder 01",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "brass_pot_01": {
+  "name": "Brass Pot 01",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "dead_tree_trunk": {
+  "name": "Dead Tree Trunk",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "dead_tree_trunk_02": {
+  "name": "Dead Tree Trunk 02",
+  "authors": [
+   "Jenelle van Heerden",
+   "Rico Cilliers"
+  ]
+ },
+ "dry_branches_medium_01": {
+  "name": "Dry Branches Medium 01",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "fern_02": {
+  "name": "Fern 02",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "fir_sapling_medium": {
+  "name": "Fir Sapling Medium",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "fir_tree_01": {
+  "name": "Fir Tree 01",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "grass_medium_01": {
+  "name": "Grass Medium 01",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "island_tree_01": {
+  "name": "Island Tree 01",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "island_tree_02": {
+  "name": "Island Tree 02",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "island_tree_03": {
+  "name": "Island Tree 03",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "moss_01": {
+  "name": "Moss 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "pine_sapling_medium": {
+  "name": "Pine Sapling Medium",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "pine_tree_01": {
+  "name": "Pine Tree 01",
+  "authors": [
+   "Rico Cilliers",
+   "Rob Tuytel"
+  ]
+ },
+ "rock_07": {
+  "name": "Rock 07",
+  "authors": [
+   "Jenelle van Heerden"
+  ]
+ },
+ "rock_09": {
+  "name": "Rock 09",
+  "authors": [
+   "Jenelle van Heerden"
+  ]
+ },
+ "rock_moss_set_01": {
+  "name": "Rock Moss Set 01",
+  "authors": [
+   "Kless Gyzen"
+  ]
+ },
+ "root_cluster_01": {
+  "name": "Root Cluster 01",
+  "authors": [
+   "Jenelle van Heerden",
+   "Rico Cilliers"
+  ]
+ },
+ "shrub_01": {
+  "name": "Shrub 01",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "shrub_02": {
+  "name": "Shrub 02",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "shrub_03": {
+  "name": "Shrub 03",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "shrub_04": {
+  "name": "Shrub 04",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "stone_fire_pit": {
+  "name": "Stone Fire Pit",
+  "authors": [
+   "Sebastian Platen"
+  ]
+ },
+ "tree_small_02": {
+  "name": "Tree Small 02",
+  "authors": [
+   "Rico Cilliers"
+  ]
+ },
+ "tree_stump_01": {
+  "name": "Tree Stump 01",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "tree_stump_02": {
+  "name": "Tree Stump 02",
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "wicker_basket_01": {
+  "name": "Wicker Basket 01",
+  "authors": [
+   "Kuutti Siitonen"
+  ]
+ },
+ "wooden_axe": {
+  "name": "Wooden Axe",
+  "authors": [
+   "Ulan Cabanilla"
+  ]
+ },
+ "wooden_barrels_01": {
+  "name": "Wooden Barrels 01",
+  "authors": [
+   "James Ray Cock"
+  ]
+ },
+ "wooden_bucket_01": {
+  "name": "Wooden Bucket 01",
+  "authors": [
+   "James Ray Cock"
+  ]
+ },
+ "wooden_crate_01": {
+  "name": "Wooden Crate 01",
+  "authors": [
+   "James Ray Cock"
+  ]
+ },
+ "wooden_lantern_01": {
+  "name": "Wooden Lantern 01",
+  "authors": [
+   "James Ray Cock"
+  ]
+ },
+ "wooden_stool_01": {
+  "name": "Wooden Stool 01",
+  "authors": [
+   "Kuutti Siitonen"
+  ]
+ }
+}

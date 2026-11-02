@@ -1,0 +1,91 @@
+{
+  "adj": {
+    "acifer_BG2_floor_01": {
+      "b": 1,
+      "c": 1,
+      "h": 0,
+      "s": 1.44
+    },
+    "acifer_BG_Grass03": {
+      "b": 1,
+      "c": 1,
+      "h": -2,
+      "s": 1
+    },
+    "dirt": {
+      "b": 0.6,
+      "c": 1,
+      "h": 0,
+      "s": 1
+    }
+  },
+  "layers": [
+    "aerial_grass_rock",
+    "forest_ground_04",
+    "forest_leaves_02",
+    "brown_mud_leaves_01",
+    "dirt",
+    "dry_riverbed_rock",
+    "grass_ground",
+    "forrest_ground_01",
+    "grass_path_2",
+    "forrest_ground_03",
+    "leaves_forest_ground",
+    "dry_decay_leaves",
+    "brown_mud_dry",
+    "red_dirt_mud_01",
+    "sandy_gravel_02",
+    "gravel_ground_01",
+    "rocky_trail",
+    "burned_ground_01",
+    "snow_02",
+    "acifer_BG_Grass03",
+    "acifer_BG_Grass05",
+    "acifer_grass03",
+    "acifer_bg-ground_01",
+    "acifer_BG2_floor_01",
+    "acifer_BG2_floor_02",
+    "acifer_BG-Cobbles_01",
+    "acifer_BG_Rock01",
+    "acifer_BG-Rocks_05",
+    "acifer_BG_Water01"
+  ],
+  "mask_size": [
+    731,
+    891
+  ],
+  "split": true,
+  "tex_m": 4,
+  "tex_m_by": {
+    "acifer_BG-Cobbles_01": 6.095,
+    "acifer_BG-Rocks_05": 12.19,
+    "acifer_BG2_floor_01": 12.19,
+    "acifer_BG2_floor_02": 12.19,
+    "acifer_BG_Grass03": 12.19,
+    "acifer_BG_Grass05": 12.19,
+    "acifer_BG_Rock01": 24.381,
+    "acifer_BG_Water01": 12.19,
+    "acifer_bg-ground_01": 12.19,
+    "acifer_grass03": 12.19,
+    "aerial_grass_rock": 4,
+    "brown_mud_dry": 4,
+    "brown_mud_leaves_01": 4,
+    "burned_ground_01": 4,
+    "dirt": 4,
+    "dry_decay_leaves": 4,
+    "dry_riverbed_rock": 4,
+    "forest_ground_04": 4,
+    "forest_leaves_02": 4,
+    "forrest_ground_01": 4,
+    "forrest_ground_03": 4,
+    "grass_ground": 4,
+    "grass_path_2": 4,
+    "gravel_ground_01": 4,
+    "leaves_forest_ground": 4,
+    "red_dirt_mud_01": 4,
+    "rocky_trail": 4,
+    "sandy_gravel_02": 4,
+    "snow_02": 4
+  },
+  "updated": "2026-11-02T21:11:36.949Z"
+}

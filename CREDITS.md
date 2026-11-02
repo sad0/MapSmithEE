@@ -1,0 +1,368 @@
+# Credits
+
+MapSmithEE ships the Camp 3D model library and an example map. Thank you to every author below.
+
+## Poly Haven (CC0)
+
+https://polyhaven.com - free CC0 models and textures.
+
+- Aerial Grass Rock (`aerial_grass_rock`) by Rob Tuytel, https://polyhaven.com/a/aerial_grass_rock
+- Boulder 01 (`boulder_01`) by Rico Cilliers, https://polyhaven.com/a/boulder_01
+- Brass Pot 01 (`brass_pot_01`) by Rico Cilliers, https://polyhaven.com/a/brass_pot_01
+- Brown Mud Dry (`brown_mud_dry`) by Rob Tuytel, https://polyhaven.com/a/brown_mud_dry
+- Brown Mud Leaves 01 (`brown_mud_leaves_01`) by Rob Tuytel, https://polyhaven.com/a/brown_mud_leaves_01
+- Burned Ground 01 (`burned_ground_01`) by Rob Tuytel, https://polyhaven.com/a/burned_ground_01
+- Dead Tree Trunk (`dead_tree_trunk`) by Rob Tuytel, https://polyhaven.com/a/dead_tree_trunk
+- Dead Tree Trunk 02 (`dead_tree_trunk_02`) by Jenelle van Heerden, Rico Cilliers, https://polyhaven.com/a/dead_tree_trunk_02
+- Dirt (`dirt`) by Charlotte Baglioni, https://polyhaven.com/a/dirt
+- Dry Branches Medium 01 (`dry_branches_medium_01`) by Rico Cilliers, https://polyhaven.com/a/dry_branches_medium_01
+- Dry Decay Leaves (`dry_decay_leaves`) by Amal Kumar, https://polyhaven.com/a/dry_decay_leaves
+- Dry Riverbed Rock (`dry_riverbed_rock`) by Amal Kumar, https://polyhaven.com/a/dry_riverbed_rock
+- Fern 02 (`fern_02`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/fern_02
+- Fir Sapling Medium (`fir_sapling_medium`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/fir_sapling_medium
+- Fir Tree 01 (`fir_tree_01`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/fir_tree_01
+- Forest Ground 04 (`forest_ground_04`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/forest_ground_04
+- Forest Leaves 02 (`forest_leaves_02`) by Rob Tuytel, https://polyhaven.com/a/forest_leaves_02
+- Forest Ground 01 (`forrest_ground_01`) by Rob Tuytel, https://polyhaven.com/a/forrest_ground_01
+- Forest Ground 03 (`forrest_ground_03`) by Rob Tuytel, https://polyhaven.com/a/forrest_ground_03
+- Grass Ground (`grass_ground`) by Charlotte Baglioni, https://polyhaven.com/a/grass_ground
+- Grass Medium 01 (`grass_medium_01`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/grass_medium_01
+- Grass Path 2 (`grass_path_2`) by Rob Tuytel, https://polyhaven.com/a/grass_path_2
+- Gravel Ground 01 (`gravel_ground_01`) by Rob Tuytel, https://polyhaven.com/a/gravel_ground_01
+- Island Tree 01 (`island_tree_01`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/island_tree_01
+- Island Tree 02 (`island_tree_02`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/island_tree_02
+- Island Tree 03 (`island_tree_03`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/island_tree_03
+- Leaves Forest Ground (`leaves_forest_ground`) by Dario Barresi, Dimitrios Savva, https://polyhaven.com/a/leaves_forest_ground
+- Moss 01 (`moss_01`) by Rob Tuytel, https://polyhaven.com/a/moss_01
+- Pine Sapling Medium (`pine_sapling_medium`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/pine_sapling_medium
+- Pine Tree 01 (`pine_tree_01`) by Rico Cilliers, Rob Tuytel, https://polyhaven.com/a/pine_tree_01
+- Red Dirt Mud 01 (`red_dirt_mud_01`) by Rob Tuytel, https://polyhaven.com/a/red_dirt_mud_01
+- Rock 07 (`rock_07`) by Jenelle van Heerden, https://polyhaven.com/a/rock_07
+- Rock 09 (`rock_09`) by Jenelle van Heerden, https://polyhaven.com/a/rock_09
+- Rock Moss Set 01 (`rock_moss_set_01`) by Kless Gyzen, https://polyhaven.com/a/rock_moss_set_01
+- Rocky Trail (`rocky_trail`) by Amal Kumar, https://polyhaven.com/a/rocky_trail
+- Root Cluster 01 (`root_cluster_01`) by Jenelle van Heerden, Rico Cilliers, https://polyhaven.com/a/root_cluster_01
+- Sandy Gravel 02 (`sandy_gravel_02`) by Dario Barresi, https://polyhaven.com/a/sandy_gravel_02
+- Shrub 01 (`shrub_01`) by Rico Cilliers, https://polyhaven.com/a/shrub_01
+- Shrub 02 (`shrub_02`) by Rico Cilliers, https://polyhaven.com/a/shrub_02
+- Shrub 03 (`shrub_03`) by Rico Cilliers, https://polyhaven.com/a/shrub_03
+- Shrub 04 (`shrub_04`) by Rico Cilliers, https://polyhaven.com/a/shrub_04
+- Snow 02 (`snow_02`) by Rob Tuytel, https://polyhaven.com/a/snow_02
+- Stone Fire Pit (`stone_fire_pit`) by Sebastian Platen, https://polyhaven.com/a/stone_fire_pit
+- Tree Small 02 (`tree_small_02`) by Rico Cilliers, https://polyhaven.com/a/tree_small_02
+- Tree Stump 01 (`tree_stump_01`) by Rob Tuytel, https://polyhaven.com/a/tree_stump_01
+- Tree Stump 02 (`tree_stump_02`) by Rob Tuytel, https://polyhaven.com/a/tree_stump_02
+- Wicker Basket 01 (`wicker_basket_01`) by Kuutti Siitonen, https://polyhaven.com/a/wicker_basket_01
+- Wooden Axe (`wooden_axe`) by Ulan Cabanilla, https://polyhaven.com/a/wooden_axe
+- Wooden Barrels 01 (`wooden_barrels_01`) by James Ray Cock, https://polyhaven.com/a/wooden_barrels_01
+- Wooden Bucket 01 (`wooden_bucket_01`) by James Ray Cock, https://polyhaven.com/a/wooden_bucket_01
+- Wooden Crate 01 (`wooden_crate_01`) by James Ray Cock, https://polyhaven.com/a/wooden_crate_01
+- Wooden Lantern 01 (`wooden_lantern_01`) by James Ray Cock, https://polyhaven.com/a/wooden_lantern_01
+- Wooden Stool 01 (`wooden_stool_01`) by Kuutti Siitonen, https://polyhaven.com/a/wooden_stool_01
+
+## Sketchfab / Objaverse models
+
+Found through the Objaverse index (https://objaverse.allenai.org). CC BY 4.0 models require this credit.
+
+- "4 sacks of white cloth" by deathcow (CC BY 4.0), https://sketchfab.com/3d-models/37769edeadac4f4c8cabc45d5ac7a3c6
+- "5 Props Assignment - @DAE" by ItzJorinoPlays (CC BY 4.0), https://sketchfab.com/3d-models/d7ac4b3c345a4aec9b1f65c0f8178003
+- "A Wooden Crate" by Banketo (CC BY 4.0), https://sketchfab.com/3d-models/4ae035ea89ea40bbaa82403b9c36afab
+- "Altar for Diana" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/c4b690f510b14f3bb5dadb19b7df8ef5
+- "Ancient Doric Column" by e.g.dev5 (CC BY 4.0), https://sketchfab.com/3d-models/46c122ebd1f14b619e4369835a4d0d62
+- "Angel" by SebastianSosnowski (CC BY 4.0), https://sketchfab.com/3d-models/c290e37480d74a82a4e4dfb66235b25d
+- "Angel Garden Ornament" by daloots (CC BY 4.0), https://sketchfab.com/3d-models/3dcffb5af4f649d8859c20d03a461904
+- "Anvil Nature Morte" by seenoise (CC BY 4.0), https://sketchfab.com/3d-models/970427a0aff3465689ac509f4fde9d94
+- "Arabian Tent" by Medhatelo (CC BY 4.0), https://sketchfab.com/3d-models/3b749076619843c28061dd81c42209df
+- "Archery Target" by KyoSaito (CC BY 4.0), https://sketchfab.com/3d-models/82ec2060f2b0431699f57f1b1782ab18
+- "Armored Horse" by naminoff (CC BY 4.0), https://sketchfab.com/3d-models/98c3f1c40a6b422dba76bf5403e0a3d8
+- "Authentic Medieval Chair (Free)" by wolfgar74 (CC BY 4.0), https://sketchfab.com/3d-models/aaf41ce3b76e482d84b2296695603a1e
+- "Axe" by Tim0 (CC BY 4.0), https://sketchfab.com/3d-models/5038f07f634345f5ac9bfa74fb821c97
+- "Bag of Potato" by heleka.k (CC BY 4.0), https://sketchfab.com/3d-models/aac1d31bc7da4cc891ce4cdd4ddeab3e
+- "Barrel" by aayooyaa (CC BY 4.0), https://sketchfab.com/3d-models/dbcf1ccd7c914eb09959aa6a93f2890b
+- "Barrel" by ape.cgart (CC BY 4.0), https://sketchfab.com/3d-models/e8a7f97dda3244f0860d708a24e47069
+- "Barrel" by DZs (CC BY 4.0), https://sketchfab.com/3d-models/ef2024160ce640558614d2d34d1e3c47
+- "Barrel" by eucocker (CC BY 4.0), https://sketchfab.com/3d-models/12ae9be3fb3c42cc8e8d272d9a153c8c
+- "Barrel" by maria_stashko (CC BY 4.0), https://sketchfab.com/3d-models/341eecd25e7f4914a6d321e71e5629af
+- "Barrel" by r.taylor (CC BY 4.0), https://sketchfab.com/3d-models/fb724fa946024db48c921de23bf08d2d
+- "Barrel & Crate" by bumstrum (CC BY 4.0), https://sketchfab.com/3d-models/ed9f90ec662b4b3c972b4567899b8293
+- "Barrel - Bat Saliva" by anandayokesh (CC BY 4.0), https://sketchfab.com/3d-models/12218c2023c44fdcaff3806f3318c72e
+- "Barrels!" by toomanydemons (CC BY 4.0), https://sketchfab.com/3d-models/1009f5c51391437e9ed2b97f04b9af31
+- "Basic Medieval Axe" by iedalton (CC BY 4.0), https://sketchfab.com/3d-models/70cb38e6c10d492896218f0886dcd263
+- "Basic Medieval Sword" by mcschule (CC BY 4.0), https://sketchfab.com/3d-models/2e59516097684de7bc0bb2e7165c0402
+- "Basic Wood Barrel" by SomeKevin (CC BY 4.0), https://sketchfab.com/3d-models/d96ef818730340bdb76ea20118649a72
+- "Bearded Axe" by TheReapersMetalworks (CC BY 4.0), https://sketchfab.com/3d-models/fedb406d84424e5e9c1dd277690aa6ea
+- "Beaten up, old doormat" by OleTobiesen (CC BY 4.0), https://sketchfab.com/3d-models/e7e7d5527b1743639e2f85bba15693ec
+- "bedding" by yearlyfruit (CC BY 4.0), https://sketchfab.com/3d-models/8356677702674268a8ec0697baaa4106
+- "Beer barrel" by pronko.tateb0776e64de54e50 (CC BY 4.0), https://sketchfab.com/3d-models/4189da714f07441c8d8c0f34a408ef78
+- "Björn's Tomb from Botkyrka Church" by historiska (CC BY 4.0), https://sketchfab.com/3d-models/d63c6c9e267c4a97b5beb7fc734e5852
+- "Blanket" by roy.gearloft.in (CC BY 4.0), https://sketchfab.com/3d-models/913519ccf84c45fd8235a5e72e478915
+- "Blanket from Poly by Google" by ie-niels (CC BY 4.0), https://sketchfab.com/3d-models/c1af9921cc2640018703a8481b1af64e
+- "Books Tent - detailed draft" by murlochek (CC BY 4.0), https://sketchfab.com/3d-models/785760430c60466dbfbada67acd99884
+- "Bow + Arrows" by lucianosoares (CC BY 4.0), https://sketchfab.com/3d-models/787a927eba44437f9bb85741c43c4eaf
+- "Brass Viking Mace" by peter.pottiez (CC BY 4.0), https://sketchfab.com/3d-models/a0c1ee6b023f4cfdacba70d40960bfba
+- "Brazier_short" by ddorsey (CC BY 4.0), https://sketchfab.com/3d-models/7e9e83d1abc24113adec8b9c1ec3a7bb
+- "Camp Bed" by lionclaw0612 (CC BY 4.0), https://sketchfab.com/3d-models/6d9bcf3d40564eddac6cc7429aabe18e
+- "Camp fire" by jhepic (CC BY 4.0), https://sketchfab.com/3d-models/abff5851ea734cbfa2d9a025425ae5b9
+- "Camp Fire" by madking (CC BY 4.0), https://sketchfab.com/3d-models/ebb469d5ea764316b3f443e22efa94c0
+- "Camp Fire" by YannisTH (CC BY 4.0), https://sketchfab.com/3d-models/3e1b91e633e64995b4023523edb3e237
+- "Campfire" by mandrake_3d (CC BY 4.0), https://sketchfab.com/3d-models/1f6834effb514d4c8a0fd34accb88251
+- "Campfire fire pit hole ash with stones" by matousekfoto (CC BY 4.0), https://sketchfab.com/3d-models/9ef5ef02ba7e4ac1a2ed3e8e379a6eed
+- "Campfire Wood Survival Warm and Light" by digrafstudio (CC BY 4.0), https://sketchfab.com/3d-models/efd0ac8c5cca46bfaae91b3851b9c75f
+- "Camping bed (comfort not guaranteed)" by Fruitgeoff (CC BY 4.0), https://sketchfab.com/3d-models/6c9d6c64d2634ddeabd625d704862175
+- "Camping sleeping bag" by bazyaev08 (CC BY 4.0), https://sketchfab.com/3d-models/d2ab6e8a8ffc472e9fca8b920662dafe
+- "Carpet" by nocyde (CC BY 4.0), https://sketchfab.com/3d-models/8001f9f214f94388840f0ce40cd13937
+- "Carpet" by sapizon (CC BY 4.0), https://sketchfab.com/3d-models/42fac4a7c4be41d783ebda6770f1ef97
+- "Carpet" by sarpersoher (CC BY 4.0), https://sketchfab.com/3d-models/4c04c67b817b4d9b8a0b52ba14359489
+- "Carpet" by Seismic_Creations (CC BY 4.0), https://sketchfab.com/3d-models/434fcc9211e1434dbee7c5024c191c4c
+- "Cauldron" by Art_Is_Scary (CC BY 4.0), https://sketchfab.com/3d-models/980f45e748964abeadebe00708e34590
+- "Cauldron" by WirtualneMuzeaMalopolski (CC0), https://sketchfab.com/3d-models/521be39e2ea94bbaa1f06f3e89b0ad97
+- "Chest" by Aki_Kato (CC BY 4.0), https://sketchfab.com/3d-models/6168cb12219a4a61a90ea615559bd74f
+- "Chest" by MaxWormsHd (CC BY 4.0), https://sketchfab.com/3d-models/35be28efe99a43c5b76cd8fed3f5c89a
+- "Chest (realistic)" by kendal316 (CC BY 4.0), https://sketchfab.com/3d-models/5e6717058d0f472baffc385170a4867f
+- "Chest for grain" by WirtualneMuzeaMalopolski (CC0), https://sketchfab.com/3d-models/abfced31176144e48929ea3f170eeb6e
+- "Church bench 2" by dwelfster (CC BY 4.0), https://sketchfab.com/3d-models/5ff95fc42d3643dc870f8958fd3fed2d
+- "cloth sack optimized for video games" by deathcow (CC BY 4.0), https://sketchfab.com/3d-models/b659e7562d2646408bfe768b193b6171
+- "Corpse" by Tamaldequeso (CC BY 4.0), https://sketchfab.com/3d-models/be9b034525c246cebab3620acb5a8027
+- "Crossbow" by laia.abad (CC BY 4.0), https://sketchfab.com/3d-models/481ef7f4e2d2445994d793a390936eef
+- "Crossbow bolt medieval game asset" by Luckkk3d (CC BY 4.0), https://sketchfab.com/3d-models/22da51b06e674052affd5dd4d86bdae8
+- "Day 329: Driftwood chair" by edemaistre (CC BY 4.0), https://sketchfab.com/3d-models/e9a3e45bb6ca43e8a1b217dc51ecb61f
+- "Dead Knight Sword and Shield" by c3posw01 (CC BY 4.0), https://sketchfab.com/3d-models/c012017310ea49669fa86450366aae54
+- "Doryphoros #StatuesTexturingChallenge [SMK]" by smkmuseum (CC0), https://sketchfab.com/3d-models/5647b4e28f1a41b0a47774361dd69ab7
+- "Dworfes King throne" by Frybrix (CC BY 4.0), https://sketchfab.com/3d-models/cc9f746084354961abafce8fa83ccd52
+- "Equestrian statue of Vercingetorix. Bartholdi" by mosheca (CC BY 4.0), https://sketchfab.com/3d-models/18ff0691cb15495787e81cafc6f06092
+- "Estàtua d'una verge - Statue of a virgin" by danard (CC BY 4.0), https://sketchfab.com/3d-models/db7ea9cafb8446ad84683faf1b4a0779
+- "Etruscan tomb (number 8)" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/921192c7acdf43b5b39e448a4111e8e4
+- "Etruscan tomb (number 9)" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/4d3d619463044aeb99e26945d32fe283
+- "Extinguished Campfire [Free Download]" by scrampunk (CC BY 4.0), https://sketchfab.com/3d-models/b2108ef43be241e9b8ea716b47873bf5
+- "Fantasy Table" by Duckkle (CC BY 4.0), https://sketchfab.com/3d-models/bad7a35fc9ad4104849bed48bbef1121
+- "Forge version2" by Funkadelc (CC BY 4.0), https://sketchfab.com/3d-models/d6e5c9048c0544d0aa99dff843d525ce
+- "Forgotten well" by PetrDostal (CC BY 4.0), https://sketchfab.com/3d-models/8345c079a1e34ae59bb95eafabab88a0
+- "Fountain" by yorre.detavernier (CC BY 4.0), https://sketchfab.com/3d-models/8580500134194ba5be3f6df7593049f2
+- "Free - Viking Axe (GameReady)" by thismanuel (CC BY 4.0), https://sketchfab.com/3d-models/0c5f661a51b6459992c94438f7dc4590
+- "Gallows" by bumstrum (CC BY 4.0), https://sketchfab.com/3d-models/b496d60155cb4b2fb5864c3e2c68a0e2
+- "game ready bow" by Razreuven (CC BY 4.0), https://sketchfab.com/3d-models/9439233f2ecd4431b071c0b9fd5c9e96
+- "Game Ready Rustic Table With Chairs" by OmegaRedZA (CC BY 4.0), https://sketchfab.com/3d-models/1163904b76864954974b31bc4640f93d
+- "Gargoyle" by CatalinObreja (CC BY 4.0), https://sketchfab.com/3d-models/fe1e8b16f7c74f5ea2838eabe91ae92b
+- "Gargoyle #3DST27" by alban (CC BY 4.0), https://sketchfab.com/3d-models/2581387ab6454f1787e50d5909b325aa
+- "Girl With Amphora - Statue" by 3dhdscan (CC BY 4.0), https://sketchfab.com/3d-models/71edd9efc26548758924ec455ac4a197
+- "Green Dragon Tavern Sign" by raeganmaddox (CC BY 4.0), https://sketchfab.com/3d-models/fa27977df232486484520036a595b237
+- "HandMade Table" by shedmon (CC BY 4.0), https://sketchfab.com/3d-models/8eba1c555e214506bffb8e174dd4cd55
+- "Hay Bed" by ScottOllard (CC BY 4.0), https://sketchfab.com/3d-models/02edc0ded21f49f2a60c6949661c4843
+- "Holzbottich - wooden vat" by Mario_Wallner (CC BY 4.0), https://sketchfab.com/3d-models/98a5ce99c6574f7b9f33c031696e1bad
+- "Horse - Blacksmith's workshop assets" by kyan0s (CC BY 4.0), https://sketchfab.com/3d-models/6fa6885634e34ff780a551728ece6c7b
+- "Horse 01" by VitSh (CC BY 4.0), https://sketchfab.com/3d-models/1474941987a043a8a9d0097fea04391d
+- "Huge Mace" by tonken (CC BY 4.0), https://sketchfab.com/3d-models/7a56cdfab8e74de9ace800d413da2362
+- "Il Commendatore" by matousekfoto (CC BY 4.0), https://sketchfab.com/3d-models/db78b94fc7b44e75856fcd7f82c5c2d3
+- "Irish Donegal Carpet" by mfb64 (CC BY 4.0), https://sketchfab.com/3d-models/74f230202c9c4d64aabc4a22624ab815
+- "Iron Maiden" by Game-Ready (CC BY 4.0), https://sketchfab.com/3d-models/e1579bd341744dd9b9179326d56200c3
+- "Lantern" by Gwappa (CC BY 4.0), https://sketchfab.com/3d-models/cda18f4050cb4bd68d63abe7c77a771e
+- "Lion Crushing a Serpent" by rigsters (CC BY 4.0), https://sketchfab.com/3d-models/d5e6b6a11da646f68a5fcba661dcae99
+- "Lion Statue" by beachmouse (CC BY 4.0), https://sketchfab.com/3d-models/9abb1020ee34465cab478616ece693ac
+- "Lion Statue - optimized" by nebulousflynn (CC0), https://sketchfab.com/3d-models/62662d27c94d4994b2479b8de3a66ca7
+- "Longsword Type XVIIIb Lowpoly Model" by leeeck (CC BY 4.0), https://sketchfab.com/3d-models/4c5494fa11be4a28892d97234826bc88
+- "Low poly medieval round shield (optimized)" by leondp (CC BY 4.0), https://sketchfab.com/3d-models/532a2fe0c32948f89a49d3e790c65e6d
+- "Low poly medieval round shield (wood & metal)" by leondp (CC BY 4.0), https://sketchfab.com/3d-models/c25ead50f21b4d7584b3a60af82a65f0
+- "Low Poly Wooden Crossbow" by d0ggo (CC BY 4.0), https://sketchfab.com/3d-models/cbecf2d76db74f7eb95359a3ae167305
+- "Mannequin armor dummy medieval game prop" by yenikholic (CC BY 4.0), https://sketchfab.com/3d-models/e57a2b32d5d94459a8ec8dfa40dd486e
+- "Medieval - Wagon" by LukasBobor (CC BY 4.0), https://sketchfab.com/3d-models/7dda053766ea433ba2cb53765ca54b45
+- "Medieval Banner" by KarlDufresne (CC BY 4.0), https://sketchfab.com/3d-models/25737d683f1d475c9c0568b44a10f2de
+- "Medieval Bed" by JordanF (CC BY 4.0), https://sketchfab.com/3d-models/59ccf6aae97f47adb32466ce5afb0e49
+- "Medieval Bow (Game Model)" by makivic (CC BY 4.0), https://sketchfab.com/3d-models/4909c74fb03645ac99ca11ddfd036c2a
+- "Medieval Brazier" by Sky_Hunter (CC BY 4.0), https://sketchfab.com/3d-models/cff29e533e3a4298a5d112cf7bb2558c
+- "Medieval cage" by vadim92.34 (CC BY 4.0), https://sketchfab.com/3d-models/8ddb80e8bcc04eec8b49e35f59150f1c
+- "Medieval Carriage" by B4TTL3CR33D (CC BY 4.0), https://sketchfab.com/3d-models/bfed092970544194bb940de841fc99b7
+- "Medieval Cart" by leone.giulio.92 (CC BY 4.0), https://sketchfab.com/3d-models/6788a348fe2d4403b29c16221d2eaf54
+- "Medieval chair" by nyx_iynx (CC BY 4.0), https://sketchfab.com/3d-models/45efb3865caa438680b45b392994b271
+- "Medieval Chair" by Tunca.Erkal (CC BY 4.0), https://sketchfab.com/3d-models/8aa1399f7bea4a1a9c4ba1538ecfd218
+- "Medieval Crossbow" by barism09 (CC BY 4.0), https://sketchfab.com/3d-models/3cf66db5021849ffa228ac540da6c01e
+- "Medieval Crossbow (Game Model)" by makivic (CC BY 4.0), https://sketchfab.com/3d-models/697aa7fee7894ad2aa0e87ebc1b9d631
+- "Medieval Fantasy - Spear Rack Asset" by vanart (CC BY 4.0), https://sketchfab.com/3d-models/3e19bc906fda4ff6ba8c1a9aa3724c1f
+- "Medieval flanged mace (worn)" by reddification (CC BY 4.0), https://sketchfab.com/3d-models/c55524ad4602410abf01519d038ca6ff
+- "Medieval Fountain Empty (Free)" by wolfgar74 (CC BY 4.0), https://sketchfab.com/3d-models/952a9c257db641229902c36abb97e8bc
+- "Medieval Knight's Long Sword" by hossam.ahmed (CC BY 4.0), https://sketchfab.com/3d-models/37f97ef25e0a46159c3e07bd231d4c25
+- "Medieval Lamp Post" by superwortel (CC BY 4.0), https://sketchfab.com/3d-models/93a1c8554ff44ca1b8bac2436da2ce42
+- "Medieval Longsword Type XVIa" by leeeck (CC BY 4.0), https://sketchfab.com/3d-models/359b73c3e8c449d7aa5fd96e7d831abd
+- "Medieval round shield (dirt, moss, blood stains)" by leondp (CC BY 4.0), https://sketchfab.com/3d-models/3914fe440c5c42509d2b9f040a311540
+- "Medieval round shield (red & blue paint)" by leondp (CC BY 4.0), https://sketchfab.com/3d-models/3fba69e80b7b4ef98792a219db262377
+- "Medieval Shield" by Kirhl (CC BY 4.0), https://sketchfab.com/3d-models/471f1dfb2d1d40d6994be92047de3645
+- "Medieval Spear" by iedalton (CC BY 4.0), https://sketchfab.com/3d-models/f61070945153418fa11c4abae286b292
+- "Medieval stall" by Cyril43 (CC BY 4.0), https://sketchfab.com/3d-models/4a5a40e78e4b481bafbb576303f992cd
+- "Medieval Steel Mace (Game Model)" by makivic (CC BY 4.0), https://sketchfab.com/3d-models/70f78341e5124b4b895dd40389d34eb9
+- "Medieval Sword" by m4rcu5j4ck50n (CC BY 4.0), https://sketchfab.com/3d-models/8ffc32ba23764b979e825ad30b0e1f58
+- "Medieval Sword Oakeshott Type XI" by leeeck (CC BY 4.0), https://sketchfab.com/3d-models/88844a7a2c874183909f33fb2264e7fb
+- "Medieval Sword Oakeshott Type XIV" by leeeck (CC BY 4.0), https://sketchfab.com/3d-models/93250a47802d49b8893d3fca4e7edcb2
+- "Medieval Sword Oakeshott Type XIV (another one!)" by leeeck (CC BY 4.0), https://sketchfab.com/3d-models/6ab380e45dea4774b633a21aa7000ad6
+- "Medieval Table (Free)" by wolfgar74 (CC BY 4.0), https://sketchfab.com/3d-models/6d4f897c019f4a55aeda23cda6e6fb57
+- "Medieval Target" by Gwappa (CC BY 4.0), https://sketchfab.com/3d-models/1ba2355831094025ba072843437b7c76
+- "Medieval Tent" by LucasPresoto (CC BY 4.0), https://sketchfab.com/3d-models/acb06bbe35f44700800638b2ff657c24
+- "Medieval Torch (Free)" by wolfgar74 (CC BY 4.0), https://sketchfab.com/3d-models/bb86fad26bcd429c93a02a79417674eb
+- "Medieval Voulge Polearm" by iedalton (CC BY 4.0), https://sketchfab.com/3d-models/1a13f0f8a03e4e7383fbe9e26046728c
+- "Medieval wagon" by olofunot (CC BY 4.0), https://sketchfab.com/3d-models/e174a83430484deb80b07b076dd01e53
+- "Medieval War Hammer" by parelaxel (CC BY 4.0), https://sketchfab.com/3d-models/665734b41cce4a49abeb757c3bda7705
+- "Medieval weapon rack" by JosueBorghi (CC BY 4.0), https://sketchfab.com/3d-models/8c55c5d985bf4d409766687007a4f734
+- "Medieval weapon rack 2" by JosueBorghi (CC BY 4.0), https://sketchfab.com/3d-models/03488181835f47f09db9d81131a2036e
+- "Medieval Well" by GetDeadEntertainment (CC BY 4.0), https://sketchfab.com/3d-models/a418c9a0d9344ff5ac698b991c4b268f
+- "Medieval well - free medium poly asset" by Andywoodhead (CC BY 4.0), https://sketchfab.com/3d-models/876b6a00b11246f6b669fbf581860a8e
+- "Medieval Wine Barrel Sample of The Dwarf Dungeon" by paburoviii (CC BY 4.0), https://sketchfab.com/3d-models/f709447c5ddf40fb80f3f4cd95f28319
+- "Medieval Wood Heater Shield" by iedalton (CC BY 4.0), https://sketchfab.com/3d-models/2a3aba2c1ef041168fab0c595e2e5882
+- "Medieval Wooden Well" by LucasPresoto (CC BY 4.0), https://sketchfab.com/3d-models/c364167420164db3bc837f351551ba1c
+- "Model of a yurt tent for a Fallout 4 mod" by ScottRafferty (CC BY 4.0), https://sketchfab.com/3d-models/3650182c361b41ecaca8761627a49457
+- "Nana rug" by besartademi8 (CC BY 4.0), https://sketchfab.com/3d-models/9b65e93a238b4f9c8e69b508bf0e4946
+- "Nana rug 2.0" by besartademi8 (CC BY 4.0), https://sketchfab.com/3d-models/c534e6e5ceac4ce6bd68abdb8c5745c9
+- "Olavskirken ruin portal" by sindrearn (CC BY 4.0), https://sketchfab.com/3d-models/1bfe20a5ed2d45f2a7c52461146e36c7
+- "Old and dusty multi-crate storage" by ionstudios (CC BY 4.0), https://sketchfab.com/3d-models/f0596d78d9d24107a4401fd6ef1843c4
+- "Old barrel" by tabletkin (CC BY 4.0), https://sketchfab.com/3d-models/19be47326d9c4526a6172c1864d37fff
+- "Old Barrel (Free Download)" by neversleep (CC BY 4.0), https://sketchfab.com/3d-models/5dab1dc5474b4bfc8a6f284fe25ab40b
+- "Old Barrels" by borcore (CC BY 4.0), https://sketchfab.com/3d-models/2521ae5b2ac84978b6bb9bfa9e188ffb
+- "Old bed" by rzyas (CC BY 4.0), https://sketchfab.com/3d-models/31593496852544d68985c8e938ff6c78
+- "Old Cart with Crates" by peter.pottiez (CC BY 4.0), https://sketchfab.com/3d-models/c478d881e6e34f0f8da705008c5bfa87
+- "Old Chest" by model_R (CC BY 4.0), https://sketchfab.com/3d-models/6349294714264dfa946ee8f33940a16e
+- "Old Chest" by SebastianSosnowski (CC BY 4.0), https://sketchfab.com/3d-models/d280b6c1a64d4fd2a1872e232ea1581a
+- "Old dirty mattress" by kifir (CC BY 4.0), https://sketchfab.com/3d-models/e914df64a021484a91613b38c28ee538
+- "Old dray cart" by ant_jura (CC BY 4.0), https://sketchfab.com/3d-models/50d3524c6f954c5e903f647940fd2df4
+- "Old Stone Well" by Theory.OAD (CC BY 4.0), https://sketchfab.com/3d-models/a2b8df0058254881b75a791bc4f9ae4a
+- "Old table" by Ledger9o9 (CC BY 4.0), https://sketchfab.com/3d-models/c1391f05e2a046ef9bd91945caf75fb8
+- "Old viking axe" by KAMAAIL (CC BY 4.0), https://sketchfab.com/3d-models/5bad15a5472247bfa8a0cf40ae935e01
+- "Old Viking Sword" by nuff3 (CC BY 4.0), https://sketchfab.com/3d-models/fdf47dbe870946fcbb7fd78de02946b4
+- "Old Vikings Shield Low poly Free model" by Al.Gil (CC BY 4.0), https://sketchfab.com/3d-models/779f9712263749589f414eb89fd89db4
+- "Old Wagon" by Somersby (CC BY 4.0), https://sketchfab.com/3d-models/00820ef5fe4843cf8beef97281048215
+- "Old wine barrel" by kolya5561 (CC BY 4.0), https://sketchfab.com/3d-models/8e739f1dadd9476b8cc8405206dee758
+- "Old Wood Wagon" by klaimtrev (CC BY 4.0), https://sketchfab.com/3d-models/91fa7ce2ea9e43a69d723cc3bd08f306
+- "Old Wooden Bed" by TwilightHunter (CC BY 4.0), https://sketchfab.com/3d-models/8d550216222a4939a7e9696206d0f32e
+- "Old Wooden Bench" by tylerlazzareschi (CC BY 4.0), https://sketchfab.com/3d-models/17222b59c59141e2a8850dead9cf1b15
+- "Old wooden cart" by GreenG (CC BY 4.0), https://sketchfab.com/3d-models/c06d6248b9d64173b376926ee212fd6f
+- "Old Wooden Stool" by niteris (CC BY 4.0), https://sketchfab.com/3d-models/a64adc1bf8cc4bab90dcc02680cfa134
+- "Old Wooden Table" by GameDevNick (CC BY 4.0), https://sketchfab.com/3d-models/e53a5ef2faf84edcaddf49d4d27f366c
+- "Old wooden table" by sergeilihandristov (CC BY 4.0), https://sketchfab.com/3d-models/b75c014af2b340febb75c83ce9eb5269
+- "Old wooden Wagon" by peter.pottiez (CC BY 4.0), https://sketchfab.com/3d-models/8e92e18ae53d484ab334eede6421f0d5
+- "Our Lady of Grace statue Virgin Mary SCAN" by Austin.Beaulier (CC BY 4.0), https://sketchfab.com/3d-models/a1e63357f3fa4a8d9a310db3ae35c2fb
+- "Pallet Bed" by KDFS01 (CC BY 4.0), https://sketchfab.com/3d-models/c9b9c316434547c892e7ac7bde27a74b
+- "PBR Debris trash wood planks  Pile Factory Scan" by perz_scans (CC BY 4.0), https://sketchfab.com/3d-models/659a7206daec4a968c35a71bbb4768aa
+- "Persian Rug" by nrecord (CC BY 4.0), https://sketchfab.com/3d-models/fe13eecfc9b8405dab1fe76c5dd28a4c
+- "Persian Tabriz Pictorial Carpet" by mfb64 (CC BY 4.0), https://sketchfab.com/3d-models/0ce2fc1e54724cb79cbb08ab2182760a
+- "Phoenix Banner" by Monhoo (CC BY 4.0), https://sketchfab.com/3d-models/06badda22c91437884f200e01899462a
+- "photogrammetry cloth sack with stones" by deathcow (CC BY 4.0), https://sketchfab.com/3d-models/2bbb50750f9845399f8948916986979f
+- "photogrammetry sacks piled" by deathcow (CC BY 4.0), https://sketchfab.com/3d-models/ccf3961370fd45eda9419c1c30f24176
+- "Pike Axe" by soidev (CC BY 4.0), https://sketchfab.com/3d-models/dfa2dff747cc4257a3e17172db2e0e57
+- "Pillory" by nudluria (CC BY 4.0), https://sketchfab.com/3d-models/6cf795ee85af4eb9b79b188e8989c5fa
+- "Pirate Chest" by Orinium (CC BY 4.0), https://sketchfab.com/3d-models/49fc687056454b7ea0afb02ee41faa86
+- "Quiver Bolt Belt - Medieval Fantasy Challenge" by tuturu (CC BY 4.0), https://sketchfab.com/3d-models/684d8484cad742f9a1fd776dd328d720
+- "Quiver with Belt - Medieval Fantasy Challenge" by tuturu (CC BY 4.0), https://sketchfab.com/3d-models/33f979682e5543a5bb7947883a573040
+- "Rabbit fur" by jweinberger (CC BY 4.0), https://sketchfab.com/3d-models/0a9d58078f44474782c506d70fef83c4
+- "Ratty Old Bed" by justincrazyeyes (CC BY 4.0), https://sketchfab.com/3d-models/8760aa7a09084d4f92392715fea093b2
+- "Rug" by kowalo (CC BY 4.0), https://sketchfab.com/3d-models/86fb1fcec24243e9ba2209323cb52ff6
+- "Rug 3D" by gibbsluke (CC BY 4.0), https://sketchfab.com/3d-models/e9efa68ea3674a22b89734ad600adb2e
+- "RUG with Bottom" by gibbsluke (CC BY 4.0), https://sketchfab.com/3d-models/43b311e5a2714126bf0134e8555d40cc
+- "Rusted Mace - Fantasy Weapon" by billyjackman3d (CC BY 4.0), https://sketchfab.com/3d-models/9bcdd2db55104fdbb233f750a25a89b8
+- "Sarcophagus with Ariadne" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/87c70ac165c2469490f84a26761e4787
+- "Season sarcophagus with portrait" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/54570e92d2b848d687e4108926390e71
+- "Semi cut trunk bench" by matousekfoto (CC BY 4.0), https://sketchfab.com/3d-models/ae2818368ae345b89537f80d38a3ff94
+- "Shield" by aptyphawk22 (CC BY 4.0), https://sketchfab.com/3d-models/323dfe4dbb764c439bcc6b0469f812eb
+- "Simple Cart Wheel" by Blender3D (CC BY 4.0), https://sketchfab.com/3d-models/41ab7571171a4c53958d1f1a85d3f083
+- "simple low poly bow" by mrpeanut (CC BY 4.0), https://sketchfab.com/3d-models/dc7361cd95364bfc843253dcd7d459e5
+- "Simple Medieval Spear" by CaptainHC (CC BY 4.0), https://sketchfab.com/3d-models/8dda9ed2503f4169bd2547f89b636413
+- "Simple Steel Mace" by mmkh (CC BY 4.0), https://sketchfab.com/3d-models/c5b39a9c83c840ad80666ab6c26f65de
+- "Simple Wood Table" by Blender3D (CC BY 4.0), https://sketchfab.com/3d-models/707c332cdb4d4f6a8eca119bfd86f061
+- "Simple Wood Table" by Blender3D (CC BY 4.0), https://sketchfab.com/3d-models/6a1d8c70c9c0425ead0e6d57316f78c6
+- "Single Bed 2" by rhcreations (CC BY 4.0), https://sketchfab.com/3d-models/81ada0e24e1647d8a0d6d0708a696f84
+- "Skeleton" by soidev (CC BY 4.0), https://sketchfab.com/3d-models/b8e05af2837d483190d196928b2bd9dc
+- "Sleeping bag" by Tactical_Beard (CC BY 4.0), https://sketchfab.com/3d-models/8098c046310445b6b15c0f1466509e35
+- "Sleeping Bag" by WillBarrow (CC BY 4.0), https://sketchfab.com/3d-models/5a5e736f608d437ebd67dacd770d5126
+- "Spear" by DafVader (CC BY 4.0), https://sketchfab.com/3d-models/6e48245075af4dd792a5449007407585
+- "Spear" by shedmon (CC BY 4.0), https://sketchfab.com/3d-models/f48bbea531964ba1aa397b6512248d47
+- "Stall [001] [Medieval Assets]" by Hanesto (CC BY 4.0), https://sketchfab.com/3d-models/6b858d55f1c54db6b0b571384dbffe26
+- "Statue of the girl" by 3dhdscan (CC BY 4.0), https://sketchfab.com/3d-models/113c62426b6f4bc9bb4c7b80e50321d5
+- "Steel Warhammer" by peter.pottiez (CC BY 4.0), https://sketchfab.com/3d-models/ae48855265ee4fa4b7c80218f16a3c56
+- "Stocks" by dirtrock (CC BY 4.0), https://sketchfab.com/3d-models/da412e6e5b86434684a4b2ddd48e7b4e
+- "Stone Altar" by TheoClarke (CC BY 4.0), https://sketchfab.com/3d-models/3d4f2edb18e4424cabb41b60aa160cb5
+- "Stone Column" by dwelfster (CC BY 4.0), https://sketchfab.com/3d-models/da28e89fcb5649a687cf32075bfe7da9
+- "Stone well" by longtail (CC BY 4.0), https://sketchfab.com/3d-models/885951c7fc0646f4bb5b136475ee2f6c
+- "Stylized Medieval Bed" by RipeR (CC BY 4.0), https://sketchfab.com/3d-models/d958bb9c5df448bd81d72bab7a2d3de4
+- "Table" by filthycent (CC BY 4.0), https://sketchfab.com/3d-models/f4e64dd973ea41a9874614468ea012e2
+- "Table" by sergeyzhizhikin (CC BY 4.0), https://sketchfab.com/3d-models/3d121e7fd78f4b44a47d3fcdb443ebbe
+- "Table 5" by eucocker (CC BY 4.0), https://sketchfab.com/3d-models/2983f936a55a4574b7ca5be8a0bfd021
+- "Target (archery)" by ragnar (CC BY 4.0), https://sketchfab.com/3d-models/bafac3d3d41048fa8cd42c8d5ca81a4c
+- "Tent" by alamiry58 (CC BY 4.0), https://sketchfab.com/3d-models/d08b16177c29480481dd62ab1179f1b0
+- "Tent" by ExparG (CC BY 4.0), https://sketchfab.com/3d-models/28373b579d854305ba14b820bd5c581c
+- "Tent" by Gajk.Mv (CC BY 4.0), https://sketchfab.com/3d-models/fa46028e8d3849399ba5271df07ed99c
+- "tent" by jhepic (CC BY 4.0), https://sketchfab.com/3d-models/79b6315d09384e8180e40e179568915b
+- "Tent" by Messerhawke (CC BY 4.0), https://sketchfab.com/3d-models/1407f16a313a4e7db0cb35831773f510
+- "Tent" by perlings (CC BY 4.0), https://sketchfab.com/3d-models/af33dfc172954f86a09fc30e7af6ffd7
+- "Tent" by ragnar (CC BY 4.0), https://sketchfab.com/3d-models/441936f01497461cb226624da9a168db
+- "Tent" by Shatien (CC BY 4.0), https://sketchfab.com/3d-models/9de12badb32f44658707bd1a954d7c56
+- "Tent" by VitSh (CC BY 4.0), https://sketchfab.com/3d-models/aa341e727e9444b09e2f709bf83bd62b
+- "Tent - V1" by Nicole_13 (CC BY 4.0), https://sketchfab.com/3d-models/256112fe93cf4512a94d345782cb03b6
+- "Tent - V2" by Nicole_13 (CC BY 4.0), https://sketchfab.com/3d-models/5104ec00d9194157b9b2205ff453578b
+- "Tent Bmt 00" by lolo0 (CC BY 4.0), https://sketchfab.com/3d-models/ca974f79fa5f4968840b1047b5704f82
+- "tent xyz" by Whostea (CC BY 4.0), https://sketchfab.com/3d-models/0d02e1463c6a4e1294b5668d6cb53a95
+- "Tent. Day 1 [XYZ School DAILY CHALLENGE]" by _SeF_ (CC BY 4.0), https://sketchfab.com/3d-models/d0baa32bd42e43398eae9b1798dd0915
+- "The Kungsåra Bench" by historiska (CC BY 4.0), https://sketchfab.com/3d-models/3c2b1ebcba444ec58c00dc2d89e69db6
+- "The Tradescant Tomb, Garden Museum, London" by nebulousflynn (CC BY 4.0), https://sketchfab.com/3d-models/344a850fc3694c35a4762a670aa72879
+- "Throne" by Folkeir (CC BY 4.0), https://sketchfab.com/3d-models/bfc6d2989bb0411d9572733d35c3e6d1
+- "Tipi" by golovecky (CC BY 4.0), https://sketchfab.com/3d-models/98cbc7ecf0ac4093928822771876d7f2
+- "Tipi 3" by Jamescunn (CC BY 4.0), https://sketchfab.com/3d-models/0f2cab2143d647cea5d5e542779716ed
+- "Tomb cover for Gaston de la Foix" by geoffreymarchal (CC BY 4.0), https://sketchfab.com/3d-models/c6ea6aac3f1546d99ffdc91624fc4c89
+- "Traveler's Wagon - SGD 114" by LThomas762 (CC BY 4.0), https://sketchfab.com/3d-models/65473708254e42409fb54ac1e18d0ec5
+- "Trolling Around - Tent" by Robert.Fraser (CC BY 4.0), https://sketchfab.com/3d-models/e52b32cd5cd54fbb914aea2ffa3da55b
+- "Tuareg Tent" by dariotolkien (CC BY 4.0), https://sketchfab.com/3d-models/832f6e357b3b40fba89c3e76ca4a3728
+- "Tw P Prop Tent 01" by lakos (CC BY 4.0), https://sketchfab.com/3d-models/8e67b78f72574cdfb8729ecf37d82a43
+- "Tw P Prop Tent 02" by lakos (CC BY 4.0), https://sketchfab.com/3d-models/c7cdc17d58e047faa459d00fe017b0cb
+- "Tw P Prop Tent 03" by lakos (CC BY 4.0), https://sketchfab.com/3d-models/73e092e4ce344683b1347521e28d5df6
+- "Ugly well" by Teslov (CC BY 4.0), https://sketchfab.com/3d-models/c9a5f08aecf64118b88a9ae57a5d322f
+- "Venus de Milo #StatuesTexturingChallenge [SMK]" by smkmuseum (CC0), https://sketchfab.com/3d-models/2983d92ac4e744f485492580ca7629f2
+- "Viking "Tea" Party - Animal Hide" by Chainheart (CC BY 4.0), https://sketchfab.com/3d-models/210d7548d63649dcbb0f3739bf28f370
+- "Viking Age Round Shield" by rigsters (CC BY 4.0), https://sketchfab.com/3d-models/b6aeee50315a437fa261d20ad0e39aae
+- "Viking Axe" by Batuhan13 (CC BY 4.0), https://sketchfab.com/3d-models/8ca95f7071244b3d9a33701d7d7f2117
+- "Viking Axe" by beyondmatter (CC BY 4.0), https://sketchfab.com/3d-models/f33f5416fa9747df97184502d71780f6
+- "Viking Axe" by free3dmodels (CC BY 4.0), https://sketchfab.com/3d-models/ca48f06c8d214fb1a186c7b12e20c55c
+- "Viking Axe" by re1monsen (CC BY 4.0), https://sketchfab.com/3d-models/e167efcb7a01479babb99a2997878211
+- "Viking Bed" by arnart204 (CC BY 4.0), https://sketchfab.com/3d-models/9babc20460d2429eaba0189101c1aef6
+- "Viking Bench" by ExplodedNun (CC BY 4.0), https://sketchfab.com/3d-models/088cbdb357d548f99d9d91c08c08f88a
+- "Viking Halberd" by beyondmatter (CC BY 4.0), https://sketchfab.com/3d-models/cf31d68f5115433a91e07a5d712e9250
+- "Viking Halberd" by carl.skanoy (CC BY 4.0), https://sketchfab.com/3d-models/506e1267e89b4c1882d35f321bbd5e39
+- "Viking Spear- High Poly" by AliNagi (CC BY 4.0), https://sketchfab.com/3d-models/fb6fc6d15545427a888dbe5d1b5595f0
+- "Viking Sword" by Kirhl (CC BY 4.0), https://sketchfab.com/3d-models/44099cd4da344239af199f246fef680d
+- "Viking sword" by sergeilihandristov (CC BY 4.0), https://sketchfab.com/3d-models/19c7dfdd8b8c4daab33807a665b9d1ee
+- "Viking Tent" by meganem (CC BY 4.0), https://sketchfab.com/3d-models/751e002e5dbe4eef9edfcec2610409a7
+- "Viking's shield and axe" by sergeilihandristov (CC BY 4.0), https://sketchfab.com/3d-models/1934240d051b435083855adc4eabaa73
+- "Wagon" by FlukierJupiter (CC BY 4.0), https://sketchfab.com/3d-models/f491eb62aaa24fdeb6dc52a1aab54d0c
+- "Wagon Wheel" by raeganmaddox (CC BY 4.0), https://sketchfab.com/3d-models/522bf736cae646a998522d666430a5a1
+- "Well" by FlukierJupiter (CC BY 4.0), https://sketchfab.com/3d-models/d8442bc92f224f0ebfa8446a1bca836d
+- "Wine Barrel" by niver_mk (CC BY 4.0), https://sketchfab.com/3d-models/5b7aefe2295f4ea5953bccb970ae76c0
+- "Woman Statue" by kaimoisch (CC BY 4.0), https://sketchfab.com/3d-models/efd353dcff8a4b8a81cdc6e3c8dec0a7
+- "Wood Bench 3D Scan - Retopo" by zdenkoroman (CC BY 4.0), https://sketchfab.com/3d-models/1192a169689d470e8d3398cc417fa5c8
+- "Wood Bench Old 3D Scan - Retopo" by zdenkoroman (CC BY 4.0), https://sketchfab.com/3d-models/d3abaaefbe434c0f9fe2c67ab3d5b710
+- "Wood Chest Photoscan PBR" by klessgyzen (CC BY 4.0), https://sketchfab.com/3d-models/114d3c43e9b64f2bafb410cb39901d6c
+- "Wood Old Shield" by MadMayMax (CC BY 4.0), https://sketchfab.com/3d-models/3f76079cdfe14ea38592e4d1e1660f1e
+- "Wood Table" by toAflame (CC BY 4.0), https://sketchfab.com/3d-models/ce6977c9de1d43048838e4802e21f7d4
+- "Wooden barrel" by gedim21 (CC BY 4.0), https://sketchfab.com/3d-models/b823e6f597824b839917a8963ab9a4e1
+- "Wooden barrel" by pmlzbt233 (CC BY 4.0), https://sketchfab.com/3d-models/fd0408523e0d443ebe0d31a63b3587f9
+- "Wooden Bed" by FlukierJupiter (CC BY 4.0), https://sketchfab.com/3d-models/d87c066434b44927b6e864ee354d4f46
+- "Wooden Bed" by shedmon (CC BY 4.0), https://sketchfab.com/3d-models/6a2744b34bc748fa8a42998ac4750567
+- "Wooden Bed" by shedmon (CC BY 4.0), https://sketchfab.com/3d-models/34cdfe3cfc4f467bad8fb088a3949f3d
+- "Wooden Bed" by toAflame (CC BY 4.0), https://sketchfab.com/3d-models/a12d3ae76e3944428f14e5b15d4f0efd
+- "Wooden Bench 3D scan" by zdenkoroman (CC BY 4.0), https://sketchfab.com/3d-models/411446b9be884eb59c93885a7ccac923
+- "Wooden Chair" by lloydrostek (CC BY 4.0), https://sketchfab.com/3d-models/df4198bc5bc04371ac5e1361e7a02def
+- "Wooden Chair Stump 3D scan" by zdenkoroman (CC BY 4.0), https://sketchfab.com/3d-models/d3c2ce5a53f047219a85c7a4f2a545fb
+- "wooden chest" by nofaced3d (CC BY 4.0), https://sketchfab.com/3d-models/e904b9d4186e4352b13ee212549b4ec6
+- "Wooden Stool" by James.Moore (CC BY 4.0), https://sketchfab.com/3d-models/d1c27ccf98f745cb81c7e5f12c20df66
+- "Wooden stool" by quedlin (CC BY 4.0), https://sketchfab.com/3d-models/34fe7fd87a924cf8aeff89ea6f012bae
+- "Wooden Stool" by santacruzmah (CC BY 4.0), https://sketchfab.com/3d-models/1905809147e645c1bb082b49710a4e97
+- "Wooden Stool with Incised Decoration" by connectionsxr (CC BY 4.0), https://sketchfab.com/3d-models/bc6082d153da41b8a5e1d69cf7860104
+- "Wooden Table" by cool-person (CC BY 4.0), https://sketchfab.com/3d-models/96d1c8a7fe6a4466ab6bdfb657f5b933
+- "Wooden Table" by lloydrostek (CC BY 4.0), https://sketchfab.com/3d-models/31ab9f9ad2fa425aa75e8bb76cad8fc1
+- "Wooden Table and Chair" by lloydrostek (CC BY 4.0), https://sketchfab.com/3d-models/884d232f9cd54b6c8c41b6bf357c704f
+- "Wooden table." by Hrisan (CC BY 4.0), https://sketchfab.com/3d-models/4b93a3649d5b4ae9bbebc244a2fc3a6f
+- "Wooden Wheel" by Axius (CC BY 4.0), https://sketchfab.com/3d-models/635534d854c84ab89cd8aec051aba8b3
+- "Wooden Wheel lowpoly" by Vyacheslav_SD (CC BY 4.0), https://sketchfab.com/3d-models/bdead7a383844203b8ea245d464ce36e
+- "Worn Wooden Bench" by Intee (CC BY 4.0), https://sketchfab.com/3d-models/39ee5c499030472ca7460f3b03077135
+
+## Other pieces
+
+- BioWare BG1 tree art, templates shared by Gwendolyne (Beamdog forums)
+
+## Baldur's Gate art (non-commercial fan content only)
+
+- BG1 tree cut-outs (`bg_*` pieces): BioWare's art from Baldur's Gate, templates shared by Gwendolyne on the Beamdog forums (https://forums.beamdog.com/discussion/71485).
+- Ground textures `acifer_*`: by Acifer, rebuilt from the BG series' areas (https://www.gibberlings3.net/forums/topic/38346-baldurs-gate-textures-for-your-3d-renders/). Non-commercial fan content for the Infinity Engine games only.
+- Fire pit flames (`fire_FPIT1*`): frames of the game's own FPIT1 animation (BioWare / Beamdog).
