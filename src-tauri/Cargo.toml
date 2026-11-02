@@ -22,6 +22,7 @@ flate2 = "1.1.10"
 png = "0.17"
 base64 = "0.22"
 memmap2 = "0.9"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [profile.release]
 codegen-units = 1

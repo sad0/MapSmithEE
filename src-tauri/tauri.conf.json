@@ -45,7 +45,8 @@
       }
     },
     "resources": {
-      "../samples/camp3d/maps/": "samples/camp3d/maps/"
+      "../samples/camp3d/maps/": "samples/camp3d/maps/",
+      "resources/blender/*.py": "blender/"
     }
   }
 }

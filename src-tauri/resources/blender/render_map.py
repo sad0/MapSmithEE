@@ -8,6 +8,7 @@
 import bpy, sys, os, json, math, base64
 from mathutils import Vector, Quaternion
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True   # the scripts may sit in a read-only install folder
 import norm
 from paths import LIB, WORK, TEX, lib as libpath
 a = sys.argv[sys.argv.index('--') + 1:]
