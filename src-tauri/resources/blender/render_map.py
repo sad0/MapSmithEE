@@ -186,15 +186,17 @@ def bgsprite(mid, B, s):
         ob = bpy.data.objects.new(me.name, me); sc.collection.objects.link(ob)
         ob.scale = (s, s, s); ob.visible_shadow = False; objs.append(ob)
     return objs
+# progress: loading a model's full copy is what takes the time (seconds to minutes each), placing a copy is quick
+_kinds = len({it['m'] for it in L['items'] if it['m'] in MODELS and 'bgsprite' not in MODELS[it['m']]['src']})
 for idx, it in enumerate(L['items']):
     mid = it['m']
-    if idx % 10 == 0: print(f"MAPSMITH items {idx}/{len(L['items'])}", flush=True)
     if mid not in MODELS: continue
     if 'bgsprite' in MODELS[mid]['src']:
         tree_o, shad_o = bgsprite(mid, MODELS[mid]['src']['bgsprite'], it.get('s', 1))
         tree_o.location = shad_o.location = three_to_bl(it['p'])
         recolour(tree_o, it.get('col')); insts.append((idx, tree_o)); decals.append(shad_o); continue
     if mid not in proto:
+        print(f"MAPSMITH models {len(proto)}/{_kinds} {mid}", flush=True)
         c = bpy.data.collections.new(mid); lib.children.link(c)
         ob = norm.load(MODELS[mid], mid)
         for col_ in list(ob.users_collection): col_.objects.unlink(ob)

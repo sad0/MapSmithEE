@@ -312,10 +312,10 @@ impl Tracker {
         if let Some(rest) = line.strip_prefix("MAPSMITH ") {
             let mut w = rest.split_whitespace();
             match (w.next(), w.next()) {
-                (Some("items"), Some(f)) => {
+                (Some("models"), Some(f)) => {
                     if let Some((i, n)) = f.split_once('/').and_then(|(i, n)| Some((i.parse::<u32>().ok()?, n.parse::<u32>().ok()?))) {
                         self.pct = 5 + 35 * i / n.max(1);
-                        self.step = format!("Loading models ({i}/{n} pieces)");
+                        self.step = format!("Loading models ({}/{n}: {})", i + 1, w.next().unwrap_or(""));
                     }
                 }
                 (Some("stage"), Some(s)) => {
@@ -540,8 +540,9 @@ mod tests {
     #[test]
     fn samples_and_stages() {
         let mut t = Tracker { id_pass: true, stage: "load", pct: 3, step: String::new(), device: String::new() };
-        assert!(t.line("MAPSMITH items 630/1260"));
+        assert!(t.line("MAPSMITH models 41/82 tent_pup"));
         assert_eq!(t.pct, 22);
+        assert_eq!(t.step, "Loading models (42/82: tent_pup)");
         t.line("MAPSMITH device OPTIX GPU");
         assert_eq!(t.device, "OPTIX GPU");
         t.line("MAPSMITH stage render");
