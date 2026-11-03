@@ -5,6 +5,7 @@ pub mod bmpmap;
 pub mod campbuild;
 pub mod camp3d;
 pub mod library;
+pub mod camprender;
 pub mod render;
 pub mod res;
 pub mod tis;
@@ -419,7 +420,10 @@ pub fn run() {
             camp3d::camp3d_set,
             camp3d::camp3d_update,
             camp3d::camp3d_delete,
-            campbuild_run
+            campbuild_run,
+            camprender::camprender_find_blender,
+            camprender::camprender_run,
+            camprender::camprender_cancel
         ])
         .run(tauri::generate_context!())
         .expect("error while running MapSmithEE");
