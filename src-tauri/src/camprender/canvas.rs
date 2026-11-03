@@ -114,7 +114,7 @@ pub fn image(params: &Value, grain: &Grain) -> RgbImage {
     let c2 = hexrgb(params.get("c2"), "#7a2a1e");
     let w = params.get("wear").and_then(Value::as_f64).unwrap_or(0.3);
     let rug = params.get("rug").is_some_and(truthy);
-    let k = (grain.std * 3.0 + 1e-6) as f32;
+    let k = grain.std * 3.0 + 1e-6;
     let mut out = RgbImage::new(SIZE, SIZE);
     for row in 0..SIZE {
         let v = 1.0 - (row as f64 + 0.5) / SIZE as f64;

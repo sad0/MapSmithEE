@@ -1,6 +1,7 @@
 //! A real Blender render through the Rust path (slow: needs Blender and the model library).
 //! `MAPSMITH_LIBRARY=<bg3d library> MAPSMITH_MAP=<maps/<id>.json> MAPSMITH_OUT=<out.png> [MAPSMITH_SAMPLES=8]
-//!  [MAPSMITH_CROP="x0 y0 x1 y1"] [MAPSMITH_ID=1] cargo test --test camprender_render -- --ignored --nocapture`
+//!  [MAPSMITH_CROP="x0 y0 x1 y1"] [MAPSMITH_ID=1] [MAPSMITH_CANCEL_AFTER=<s>] cargo test --test camprender_render -- --ignored --nocapture`
+//! With MAPSMITH_CANCEL_AFTER the render is cancelled after that many seconds and must return Err("cancelled").
 //! The ground doc and masks are read next to the map (`<id>_ground.json`, `<id>_g<n>.json`).
 
 use std::path::PathBuf;
@@ -55,7 +56,20 @@ fn render_sample_map() {
         }
         *l = (pct, step.to_string());
     };
-    let r = render(&req, &progress, &AtomicBool::new(false)).unwrap();
+    let cancel = AtomicBool::new(false);
+    if let Some(s) = std::env::var("MAPSMITH_CANCEL_AFTER").ok().and_then(|s| s.parse::<u64>().ok()) {
+        let r = std::thread::scope(|sc| {
+            sc.spawn(|| {
+                std::thread::sleep(std::time::Duration::from_secs(s));
+                cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            });
+            render(&req, &progress, &cancel)
+        });
+        println!("[{:6.1}s] {r:?}", t0.elapsed().as_secs_f64());
+        assert_eq!(r.unwrap_err(), "cancelled");
+        return;
+    }
+    let r = render(&req, &progress, &cancel).unwrap();
     println!("{r:?}");
     assert!(r.out_png.is_file());
 }

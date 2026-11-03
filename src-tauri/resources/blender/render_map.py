@@ -48,6 +48,8 @@ sc.cycles.device = 'GPU' if any(d.type != 'CPU' for d in prefs.devices) else 'CP
 sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
 print('MAPSMITH device', prefs.compute_device_type, sc.cycles.device, flush=True)
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.exposure = -0.4
+# Cycles' status ('... | Updating Images', '... | Sample 3/128'): bpy.ops.render.render prints none of it by itself
+bpy.app.handlers.render_stats.append(lambda st: print('MAPSMITH stats', st, flush=True))
 
 def three_to_bl(p): return Vector((p[0], -p[2], p[1]))     # editor (x, y up, z south) -> Blender (x, y north, z up)
 

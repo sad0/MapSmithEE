@@ -176,7 +176,7 @@ fn candidates() -> Vec<((u32, u32), PathBuf)> {
 /// The scripts need Blender 4.0 or later; they are tested with 5.2.
 pub fn find_blender() -> Option<PathBuf> {
     let mut c = candidates();
-    c.sort_by(|a, b| b.0.cmp(&a.0));
+    c.sort_by_key(|x| std::cmp::Reverse(x.0));
     let pick = |ok: &dyn Fn((u32, u32)) -> bool| c.iter().find(|(v, _)| ok(*v)).map(|(_, p)| p.clone());
     pick(&|v| v.0 >= 5).or_else(|| pick(&|v| v.0 == 4)).or_else(|| pick(&|v| v == (0, 0)))
 }
@@ -309,7 +309,18 @@ impl Tracker {
     /// true when the progress changed
     fn line(&mut self, line: &str) -> bool {
         let (pct, step) = (self.pct, self.step.clone());
-        if let Some(rest) = line.strip_prefix("MAPSMITH ") {
+        if let Some(st) = line.strip_prefix("MAPSMITH stats ").or_else(|| line.strip_prefix("Fra:")) {
+            // "Mem: 3M | Sample 12/128", "Mem: 1M | Updating Images": the last part says what Blender does
+            if let Some((a, b)) = sample_of(st) {
+                let (lo, hi) = self.span();
+                if self.stage != "load" && b > 0 {
+                    self.pct = lo + (hi - lo) * a.min(b) / b;
+                }
+                self.step = format!("{} (sample {a}/{b})", self.stage_name());
+            } else if let Some(last) = st.rsplit('|').next().map(str::trim).filter(|s| !s.is_empty()) {
+                self.step = format!("{}: {last}", self.stage_name());
+            }
+        } else if let Some(rest) = line.strip_prefix("MAPSMITH ") {
             let mut w = rest.split_whitespace();
             match (w.next(), w.next()) {
                 (Some("models"), Some(f)) => {
@@ -338,17 +349,6 @@ impl Tracker {
         } else if line.starts_with("placed ") {
             self.pct = 40;
             self.step = "Lights and camera".into();
-        } else if let Some((a, b)) = sample_of(line) {
-            let (lo, hi) = self.span();
-            if self.stage != "load" && b > 0 {
-                self.pct = lo + (hi - lo) * a.min(b) / b;
-            }
-            self.step = format!("{} (sample {a}/{b})", self.stage_name());
-        } else if line.starts_with("Fra:") && self.stage != "load" {
-            // "Fra:1 Mem:... | Scene, ViewLayer | Loading render kernels": the last part says what Blender does
-            if let Some(last) = line.rsplit('|').next().map(str::trim).filter(|s| !s.is_empty()) {
-                self.step = format!("{}: {last}", self.stage_name());
-            }
         }
         self.pct != pct || self.step != step
     }
@@ -449,9 +449,11 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok((is_err, line)) => {
                 traceback |= line.starts_with("Traceback");
-                tail.push(if is_err { format!("! {line}") } else { line.clone() });
-                if tail.len() > 40 {
-                    tail.remove(0);
+                if !line.starts_with("MAPSMITH stats ") {
+                    tail.push(if is_err { format!("! {line}") } else { line.clone() });
+                    if tail.len() > 40 {
+                        tail.remove(0);
+                    }
                 }
                 if !is_err && tr.line(&line) {
                     progress(tr.pct, &tr.step);
@@ -467,7 +469,8 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
     if !status.success() || traceback || !out.is_file() {
         return Err(format!("Blender failed ({status}):\n{}", tail.join("\n")));
     }
-    let side = |suffix: &str| PathBuf::from(format!("{}{suffix}", &out_s[..out_s.len() - 4]));
+    let stem = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+    let side = |suffix: &str| out.with_file_name(format!("{stem}{suffix}"));
     let (alpha, id) = if req.id_pass { (Some(side("_alpha.png")), Some(side("_id.png"))) } else { (None, None) };
     progress(100, "Done");
     Ok(RenderReport {
@@ -516,8 +519,15 @@ pub async fn camprender_run(app: tauri::AppHandle, req: RenderRequest) -> Result
         req.scripts_dir = Some(scripts_dir(&app));
     }
     let r = tauri::async_runtime::spawn_blocking(move || {
+        // Blender reports dozens of steps a second while it prepares a render: at most ~8 events a second, except
+        // when the percentage moves
+        let last = std::sync::Mutex::new((u32::MAX, Instant::now()));
         let progress = |pct: u32, step: &str| {
-            let _ = app.emit("camprender-progress", Progress { pct, step: step.to_string() });
+            let mut l = last.lock().unwrap();
+            if pct != l.0 || pct == 100 || l.1.elapsed() >= Duration::from_millis(120) {
+                *l = (pct, Instant::now());
+                let _ = app.emit("camprender-progress", Progress { pct, step: step.to_string() });
+            }
         };
         render(&req, &progress, &CANCEL)
     })
@@ -547,12 +557,12 @@ mod tests {
         assert_eq!(t.device, "OPTIX GPU");
         t.line("MAPSMITH stage render");
         assert_eq!(t.pct, 40);
-        t.line("Fra:1 Mem:1.2G (Peak 2G) | Time:00:01.00 | Mem:0.5G, Peak:0.5G | Scene, ViewLayer | Sample 4/8");
+        t.line("MAPSMITH stats Remaining: 00:00.30 | Mem: 3M | Sample 4/8");
         assert_eq!(t.pct, 64);
-        t.line("Fra:1 Mem:1.2G | Scene, ViewLayer | Loading render kernels");
-        assert_eq!(t.step, "Rendering: Loading render kernels");
+        t.line("MAPSMITH stats Mem: 1M | Loading render kernels (may take a few minutes the first time)");
+        assert_eq!(t.step, "Rendering: Loading render kernels (may take a few minutes the first time)");
         t.line("MAPSMITH stage alpha");
-        t.line("Fra:1 | Sample 16/16");
+        t.line("Fra:1 Mem:1.2G | Scene, ViewLayer | Sample 16/16");
         assert_eq!(t.pct, 97);
         assert_eq!(sample_of("x | Sample 12/128"), Some((12, 128)));
     }
