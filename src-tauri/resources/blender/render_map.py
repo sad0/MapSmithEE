@@ -305,6 +305,7 @@ for k, job in enumerate(JOBS):
     sc.render.engine = 'BLENDER_WORKBENCH'
     sc.display.shading.light = 'FLAT'; sc.display.shading.color_type = 'OBJECT'
     sc.display.render_aa = 'OFF'; sc.view_settings.view_transform = 'Raw'; sc.view_settings.exposure = 0   # Raw: the colours stay exact numbers
+    sc.render.dither_intensity = 0   # dither adds +-1 noise: a piece's number then read as its neighbour's (fire pit pixels in the tent's walls)
     sc.display.shading.show_shadows = False; sc.display.shading.show_cavity = False
     gnd.color = (0, 0, 0, 1)
     for idx, inst in insts:

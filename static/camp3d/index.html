@@ -57,7 +57,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
 <header>
   <h1>Camp Map 3D</h1>
   <div class="grp"><span class="lbl">View</span><button id="vBG" class="on" title="The game's camera">BG camera</button><button id="vFree" title="Orbit freely">Free</button></div>
-  <div class="grp"><span class="lbl">Tool</span><button id="tSel" class="on">Select (Q)</button><button id="tPaint">Paint ground</button><button id="tTrees">Tree brush</button><button id="tCamp" title="Where the camp people stand, the arrival point, the exits">Camp spots</button><button id="tWalk" title="Where the party can walk (the game's search map)">Walkable</button></div>
+  <div class="grp"><span class="lbl">Tool</span><button id="tSel" class="on">Select (Q)</button><button id="tPaint">Paint ground</button><button id="tTrees">Tree brush</button><button id="tCamp" title="Where the camp people stand, the arrival point, the exits">Camp spots</button><button id="tWalk" title="Where the party can walk (the game's search map)">Walkable</button><button id="tWallT" title="What hides the characters standing behind a piece in the game">Walls</button></div>
   <div class="grp"><span class="lbl">Light</span><button id="tDay" class="on" title="BG's sun: south-west, 45°, shadows up-right">Day</button><button id="tNight" title="Moonlight; fires, braziers, lanterns and torches lit">Night</button></div>
   <div class="grp"><span class="lbl">Map</span><select id="mapSel"></select><button id="mapNew">New map</button><button id="mapResize">Resize</button></div>
   <div class="grp"><button id="calib" title="One of each model of the selected group: set each one's height on the ground, once for all">Calibrate</button><button id="calibSave" hidden>Save heights</button></div>
@@ -158,6 +158,17 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
     <div class="hint">Red: blocked. Objects block their footprint by themselves (trees their trunk; grass, ferns and small props do not). Paint to correct.</div>
     <div class="row"><button id="wBlock" class="on">Block</button><button id="wFree">Free</button><button id="wAuto">Back to automatic</button></div>
     <div class="row"><label>Brush</label><input id="wSize" type="range" min="0.3" max="20" step="0.1" value="1" style="flex:1"><span id="wSizeL" class="lbl"></span></div>
+  </div>
+  <div id="wallBox" hidden>
+    <h2>Walls</h2>
+    <div class="hint">In the game, a wall hides the characters standing behind it. <b style="color:#5fe0e0">Cyan</b>: traced at the last render. <b style="color:#ffd27a">Yellow</b>: your own. <b style="color:#ff7a6a">Red</b>: turned off.</div>
+    <div class="hint" id="wlInfo"></div>
+    <div class="row"><button id="wlDraw" title="Click points on the map; click the first one (or press Enter) to close">Draw a wall</button><button id="wlDel" title="Delete (Del)">Turn off / delete</button></div>
+    <div class="row"><button id="wlAuto" title="This piece's wall back to the traced one">Back to traced</button></div>
+    <div class="hint">Click a wall to select it. Drag its points; double-click its edge to add a point; right-click a point to remove it. Works in the BG camera.</div>
+    <h2>Area</h2>
+    <div class="row"><button id="wlBuild" title="Rebuild the area from the last render's pictures with your walls, spots and walkable cells: no Blender, seconds">Rebuild area (no render)</button></div>
+    <div class="hint" id="wlBuildInfo">Moved or added pieces need a new render.</div>
   </div>
   <div id="treeBox" hidden>
     <h2>Tree brush</h2>
@@ -262,7 +273,7 @@ let adj = GROUNDS.map(() => ({ ...ADJ0 }));
 const cssFilter = a => `hue-rotate(${a.h}deg) saturate(${a.s}) brightness(${a.b}) contrast(${a.c})`;
 const TEX_M = 4;            // one texture tile covers 4 m
 
-let M = {}, S = { items: [], spots: {}, exits: [], time: 14 }, db = null, mapDoc = null, groundDoc = null, reqDoc = null, canWrite = true;
+let M = {}, S = { items: [], spots: {}, exits: [], walls: [], time: 14 }, db = null, mapDoc = null, groundDoc = null, reqDoc = null, canWrite = true;
 let mapId = 'camp3d', maps = [{ id: 'camp3d', name: 'Camp', tiles: [40, 30] }], indexDoc = null;
 const renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true });
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // PCF honours shadow.radius: soft edges like BG's
@@ -656,8 +667,10 @@ function getModel(id) {
   return loading[id];
 }
 const objs = [];             // { it: saved item, node: Object3D }
+let idsAdded = false;         // pieces got their id (older maps): save them
 const root = new THREE.Group(); scene.add(root);
 async function spawn(it) {
+  if (!it.id) { it.id = Math.random().toString(36).slice(2, 9); idsAdded = true; }
   if (it.m === 'flame') {
     const n = new THREE.Object3D(); n.userData.item = it; n.position.fromArray(it.p);
     const o = { it, node: n, sprite: null }; refreshFlame(o); root.add(n); objs.push(o); return o;
@@ -1024,14 +1037,15 @@ addEventListener('keydown', e => {
   else if (k === 'escape') { if (picking) setPicking(false); placing = null; [...$('tray').children].forEach(c => c.classList.remove('pick')); select(null); }
 });
 function setTool(t) {
-  tool = t; ['tSel', 'tPaint', 'tTrees', 'tCamp', 'tWalk'].forEach((b, i) => $(b).classList.toggle('on', ['sel', 'paint', 'trees', 'camp', 'walk'][i] === t));
+  tool = t; ['tSel', 'tPaint', 'tTrees', 'tCamp', 'tWalk', 'tWallT'].forEach((b, i) => $(b).classList.toggle('on', ['sel', 'paint', 'trees', 'camp', 'walk', 'walls'][i] === t));
+  $('wallBox').hidden = t !== 'walls'; if (typeof wallsShow === 'function') wallsShow(t === 'walls');
   $('selBox').hidden = t !== 'sel'; $('paintBox').hidden = t !== 'paint'; $('treeBox').hidden = t !== 'trees';
   $('campBox').hidden = t !== 'camp'; $('walkBox').hidden = t !== 'walk';
   if (typeof walkPlane !== 'undefined') { walkPlane.visible = t === 'walk' || t === 'camp'; if (walkPlane.visible) refreshWalk(); }
   if (t !== 'sel') select(null);
   if (t !== 'paint' && typeof picking !== 'undefined' && picking) setPicking(false);
 }
-$('tCamp').onclick = () => setTool('camp'); $('tWalk').onclick = () => setTool('walk');
+$('tCamp').onclick = () => setTool('camp'); $('tWalk').onclick = () => setTool('walk'); $('tWallT').onclick = () => setTool('walls');
 $('tSel').onclick = () => setTool('sel'); $('tPaint').onclick = () => setTool('paint'); $('tTrees').onclick = () => setTool('trees');
 
 /* ---------- pointer on the ground ---------- */
@@ -1042,6 +1056,7 @@ function hit(e, targets) {
 }
 let stroke = null;
 $('cv').addEventListener('pointerdown', async e => {
+  if (tool === 'walls') { wallDown(e); return; }
   if (e.button !== 0 || tc.dragging || e.altKey) return;
   if (tool === 'sel' && placing) {
     const h = hit(e, [groundNow()]); if (!h) return;
@@ -1317,6 +1332,155 @@ function treeBrush(c) {
   }
 }
 
+/* ---------- walls: what hides the characters behind a piece in the game (WED wall polygons). Traced from the last
+   render's passes; a piece's edit (it.wall: {off} or {pts} relative to its ground point, area pixels) and the free walls
+   (S.walls, area pixels) are applied at the next build ---------- */
+const wallGroup = new THREE.Group(); wallGroup.visible = false; scene.add(wallGroup);
+let wallData = null, wSel = null, wDrag = null, wDraw = null;
+const sinE = () => Math.sin(ELEV);
+const toGround = (x, y) => new THREE.Vector3(x / PXM, 0.06, y / (PXM * sinE()));
+const toArea = v => [Math.round(v.x * PXM), Math.round(v.z * PXM * sinE())];
+const gNow = it => [Math.round(it.p[0] * PXM), Math.round(it.p[2] * PXM * sinE())];
+function wallItem(a) { return S.items.find(it => a.id && it.id === a.id) || (!a.id ? S.items[a.i] : null); }
+// every wall to show: { kind: 'auto' | 'own' | 'off' | 'free', it?, polys: [[[x, y]...]...] } in area pixels
+function wallList() {
+  const out = [], seen = new Set();
+  for (const a of (wallData && wallData.auto) || []) {
+    const it = wallItem(a); if (!it) continue; seen.add(it);
+    const g = gNow(it), d = [g[0] - a.g[0], g[1] - a.g[1]];
+    const traced = a.pts.map(v => v.map(([x, y]) => [x + d[0], y + d[1]]));
+    if (it.wall && it.wall.off) out.push({ kind: 'off', it, polys: traced });
+    else if (it.wall && it.wall.pts) out.push({ kind: 'own', it, polys: it.wall.pts.map(v => v.map(([x, y]) => [g[0] + x, g[1] + y])) });
+    else out.push({ kind: 'auto', it, polys: traced, a });
+  }
+  // pieces with their own wall but none traced (new since the render, or too small to trace)
+  for (const it of S.items) if (!seen.has(it) && it.wall && it.wall.pts) { const g = gNow(it); out.push({ kind: 'own', it, polys: it.wall.pts.map(v => v.map(([x, y]) => [g[0] + x, g[1] + y])) }); }
+  S.walls.forEach((v, k) => out.push({ kind: 'free', k, polys: [v] }));
+  return out;
+}
+const WCOL = { auto: 0x5fe0e0, own: 0xffd27a, free: 0xffd27a, off: 0xff7a6a };
+function drawWalls() {
+  wallGroup.clear(); if (!wallGroup.visible) return;
+  for (const w of wallList()) {
+    const on = wSel && sameWall(wSel, w);
+    w.polys.forEach((v, k) => {
+      const g = new THREE.BufferGeometry().setFromPoints(v.map(([x, y]) => toGround(x, y)));
+      const m = new THREE.LineLoop(g, new THREE.LineBasicMaterial({ color: on ? 0xffffff : WCOL[w.kind], depthTest: false, transparent: true, opacity: w.kind === 'off' ? 0.6 : 1 }));
+      m.renderOrder = 13; wallGroup.add(m);
+      if (on && w.kind !== 'off') {
+        const pts = new THREE.Points(g.clone(), new THREE.PointsMaterial({ color: 0xffffff, size: 7, sizeAttenuation: false, depthTest: false }));
+        pts.renderOrder = 14; wallGroup.add(pts);
+      }
+    });
+  }
+  if (wDraw && wDraw.length) {
+    const g = new THREE.BufferGeometry().setFromPoints(wDraw.map(([x, y]) => toGround(x, y)));
+    const m = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false })); m.renderOrder = 13; wallGroup.add(m);
+    const pts = new THREE.Points(g.clone(), new THREE.PointsMaterial({ color: 0xffd27a, size: 7, sizeAttenuation: false, depthTest: false })); pts.renderOrder = 14; wallGroup.add(pts);
+  }
+}
+const sameWall = (a, b) => a.kind === 'free' ? b.kind === 'free' && a.k === b.k : b.kind !== 'free' && a.it === b.it;
+function curSel() { return wSel ? wallList().find(w => sameWall(wSel, w)) || null : null; }
+async function wallsShow(on) {
+  wallGroup.visible = on; wSel = null; wDraw = null; $('wlDraw').classList.remove('on');
+  if (on) {
+    try { wallData = await window.__TAURI__.core.invoke('camp3d_walls', { mapId }); } catch { wallData = null; }
+    $('wlInfo').textContent = wallData ? `Traced at the last render (${wallData.last.name}): ${wallData.auto.length} pieces.` : 'Render this map once to see its traced walls. Your own walls work already.';
+    if (cam !== camBG) toast('Walls: switch to the BG camera to edit them');
+  }
+  drawWalls(); wallButtons();
+}
+function wallButtons() {
+  const w = curSel();
+  $('wlDel').disabled = !w || w.kind === 'off'; $('wlAuto').disabled = !w || !w.it || !w.it.wall;
+}
+// screen position of an area pixel
+function scr(x, y) { const v = toGround(x, y).project(cam), r = $('cv').getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }
+function inPoly(p, v) { let c = false; for (let i = 0, j = v.length - 1; i < v.length; j = i++) { if ((v[i][1] > p[1]) !== (v[j][1] > p[1]) && p[0] < (v[j][0] - v[i][0]) * (p[1] - v[i][1]) / (v[j][1] - v[i][1]) + v[i][0]) c = !c; } return c; }
+const polyArea = v => Math.abs(v.reduce((s, p, i) => { const q = v[(i + 1) % v.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+// the selected wall made editable: a traced one becomes the piece's own (relative to its ground point)
+function editable(w) {
+  if (w.kind === 'free') return { polys: [S.walls[w.k]], commit: () => {} };
+  const g = gNow(w.it);
+  if (w.kind !== 'own') w.it.wall = { pts: w.polys.map(v => v.map(([x, y]) => [x - g[0], y - g[1]])) };
+  return { polys: w.it.wall.pts, g };
+}
+function wallDown(e) {
+  if (cam !== camBG) { toast('Walls: switch to the BG camera to edit them'); return; }
+  const h = hit(e, [groundNow()]); if (!h) return;
+  const p = toArea(h.point);
+  if (wDraw) {
+    if (e.button !== 0) return;
+    if (wDraw.length >= 3) { const f = scr(...wDraw[0]); if (Math.hypot(e.clientX - f[0], e.clientY - f[1]) < 10) { closeDraw(); return; } }
+    wDraw.push(p); drawWalls(); return;
+  }
+  const w = curSel();
+  // a point of the selected wall: drag it, or (right button) remove it
+  if (w && w.kind !== 'off') {
+    for (let k = 0; k < w.polys.length; k++) for (let i = 0; i < w.polys[k].length; i++) {
+      const s = scr(...w.polys[k][i]); if (Math.hypot(e.clientX - s[0], e.clientY - s[1]) > 8) continue;
+      const ed = editable(w);
+      if (e.button === 2) { if (ed.polys[k].length > 3) { ed.polys[k].splice(i, 1); changed(); drawWalls(); } return; }
+      wDrag = { ed, k, i }; $('cv').setPointerCapture(e.pointerId); return;
+    }
+  }
+  if (e.button !== 0) return;
+  // pick: the smallest wall under the cursor
+  let best = null, ba = Infinity;
+  for (const x of wallList()) for (const v of x.polys) if (inPoly(p, v)) { const a = polyArea(v); if (a < ba) { ba = a; best = x; } }
+  wSel = best ? (best.kind === 'free' ? { kind: 'free', k: best.k } : { kind: best.kind, it: best.it }) : null;
+  drawWalls(); wallButtons();
+}
+$('cv').addEventListener('pointermove', e => {
+  if (!wDrag) return; const h = hit(e, [groundNow()]); if (!h) return;
+  const p = toArea(h.point), { ed, k, i } = wDrag;
+  ed.polys[k][i] = ed.g ? [p[0] - ed.g[0], p[1] - ed.g[1]] : p; drawWalls();
+});
+$('cv').addEventListener('pointerup', () => { if (wDrag) { wDrag = null; changed(); } });
+$('cv').addEventListener('dblclick', e => {
+  if (tool !== 'walls' || wDraw) return; const w = curSel(); if (!w || w.kind === 'off') return;
+  const h = hit(e, [groundNow()]); if (!h) return; const p = toArea(h.point);
+  // the nearest edge gets the new point
+  let best = null, bd = 14;
+  w.polys.forEach((v, k) => v.forEach((a, i) => {
+    const b = v[(i + 1) % v.length], sa = scr(...a), sb = scr(...b), dx = sb[0] - sa[0], dy = sb[1] - sa[1];
+    const t = Math.max(0, Math.min(1, ((e.clientX - sa[0]) * dx + (e.clientY - sa[1]) * dy) / (dx * dx + dy * dy || 1)));
+    const d = Math.hypot(e.clientX - sa[0] - t * dx, e.clientY - sa[1] - t * dy); if (d < bd) { bd = d; best = { k, i }; }
+  }));
+  if (!best) return; const ed = editable(w);
+  ed.polys[best.k].splice(best.i + 1, 0, ed.g ? [p[0] - ed.g[0], p[1] - ed.g[1]] : p); changed(); drawWalls();
+});
+$('cv').addEventListener('contextmenu', e => { if (tool === 'walls') e.preventDefault(); });
+function closeDraw() {
+  if (wDraw && wDraw.length >= 3) { S.walls.push(wDraw); wSel = { kind: 'free', k: S.walls.length - 1 }; changed(); }
+  wDraw = null; $('wlDraw').classList.remove('on'); drawWalls(); wallButtons();
+}
+function wallDelete() {
+  const w = curSel(); if (!w) return;
+  if (w.kind === 'free') { S.walls.splice(w.k, 1); wSel = null; }
+  else { w.it.wall = { off: true }; wSel = { kind: 'off', it: w.it }; }
+  changed(); drawWalls(); wallButtons();
+}
+$('wlDraw').onclick = () => { if (wDraw) { closeDraw(); return; } wDraw = []; wSel = null; $('wlDraw').classList.add('on'); drawWalls(); toast('Click points on the map; click the first one or press Enter to close'); };
+$('wlDel').onclick = wallDelete;
+$('wlAuto').onclick = () => { const w = curSel(); if (!w || !w.it) return; delete w.it.wall; changed(); drawWalls(); wallButtons(); };
+addEventListener('keydown', e => {
+  if (tool !== 'walls' || typing(e.target)) return;
+  if (e.key === 'Enter' && wDraw) closeDraw();
+  else if (e.key === 'Escape') { if (wDraw) { wDraw = null; $('wlDraw').classList.remove('on'); } else wSel = null; drawWalls(); wallButtons(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && wSel) wallDelete();
+});
+$('wlBuild').onclick = async () => {
+  $('wlBuild').disabled = true; $('wlBuildInfo').textContent = 'Building…';
+  try {
+    await save();
+    const r = await window.__TAURI__.core.invoke('camp3d_rebuild_area', { mapId });
+    $('wlBuildInfo').textContent = `Done in ${r.seconds} s: ${r.walls} walls, ${r.files.length} files in ${r.out_dir}. Copy them into the game's override again.`;
+    wallData = await window.__TAURI__.core.invoke('camp3d_walls', { mapId }); drawWalls();
+  } catch (err) { $('wlBuildInfo').textContent = 'Could not rebuild: ' + err; }
+  $('wlBuild').disabled = false;
+};
+
 /* ---------- time of day ---------- */
 const SUN_DIR = new THREE.Vector3(-0.61, 0, 0.79).normalize().multiplyScalar(Math.cos(Math.PI / 4)).setY(Math.sin(Math.PI / 4));
 // every fire, brazier, lantern and torch lights its surroundings: strongly at night, a faint halo by day (the twin of
@@ -1387,7 +1551,7 @@ let saveT = null, saving = false, dirty = false, gSaveT = null, gSaving = false;
 // undo / redo: the map's pieces, people, exits and light after each change, plus each ground stroke and ground colour
 // change (not the walkable cells)
 let hist = [], hpos = -1, restoring = false;
-const snapState = () => JSON.stringify({ items: S.items, spots: S.spots, exits: S.exits, time: S.time });
+const snapState = () => JSON.stringify({ items: S.items, spots: S.spots, exits: S.exits, walls: S.walls, time: S.time });
 function histReset() { hist = [{ s: snapState() }]; hpos = 0; }
 function histPush(e) { hist = hist.slice(0, hpos + 1); hist.push(e); if (hist.length > 60) hist.shift(); hpos = hist.length - 1; }
 async function histGo(d) {
@@ -1397,8 +1561,9 @@ async function histGo(d) {
   if (ge) { groundApply(ge, d < 0 ? 'before' : 'after'); hpos = i; toast(d < 0 ? `Undone (${hpos} more back)` : `Redone (${hist.length - 1 - hpos} more ahead)`); return; }
   restoring = true; const st = JSON.parse(hist[i].s);
   select(null); for (const o of objs.splice(0)) root.remove(o.node);
-  S.items = st.items; S.spots = st.spots; S.exits = st.exits;
+  S.items = st.items; S.spots = st.spots; S.exits = st.exits; S.walls = st.walls || [];
   await Promise.all(S.items.map(spawn)); setTime(st.time); drawCamp(); if (walkPlane.visible) refreshWalk();
+  wSel = null; if (wallGroup.visible) drawWalls();
   hpos = i; changed(); restoring = false;
   toast(d < 0 ? `Undone (${hpos} more back)` : `Redone (${hist.length - 1 - hpos} more ahead)`);
 }
@@ -1420,7 +1585,7 @@ function changed() {
 }
 async function save() {
   if (saving || !dirty) return; saving = true; dirty = false; status('Saving…');
-  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: 38, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
+  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: 38, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
   catch (e) { status(e && e.code === 'permission_denied' ? 'View only: changes are not kept' : 'Save failed, will retry', 'warn'); if (e && e.code === 'permission_denied') canWrite = false; }
   saving = false; if (dirty) save();
 }
@@ -1510,7 +1675,7 @@ async function openMap(id) {
   adj = GROUNDS.map(g => ({ ...ADJ0, ...(gd.adj || {})[g.id] }));
   setMapSize(tiles); showAdj();
   S.items = (d.items || []).filter(i => M[i.m]); setTime(d.time ?? 14);
-  S.spots = d.spots || {}; S.exits = d.exits || [];
+  S.spots = d.spots || {}; S.exits = d.exits || []; S.walls = d.walls || [];
   spotset = SPOT_SETS[d.spotset] ? d.spotset : 'camp'; SPOTS = SPOT_SETS[spotset];
   walkDoc = db.doc('maps/' + id + '_walk');
   { const wsnap = await walkDoc.get(); const [cw, ch] = walkCells(); walkFix.width = cw; walkFix.height = ch;
@@ -1521,7 +1686,7 @@ async function openMap(id) {
     const sp = S.spots.FIRE, bam = sp.bam || 'FPIT1L', it = { m: 'flame', p: [sp.p[0], 0, sp.p[1]], q: [0, 0, 0, 1], s: FIRE_SIZE[bam] || 1.5, bam };
     S.items.push(it); await spawn(it); fireSpotFromFlames(); drawCamp(); dirty = true;
   }
-  setTime(S.time); histReset();
+  setTime(S.time); histReset(); if (idsAdded) { idsAdded = false; dirty = true; clearTimeout(saveT); saveT = setTimeout(save, 1200); }
   if (gsnap.exists) {
     const g = gsnap.data();
     // split layers (current) or the older single document with every mask

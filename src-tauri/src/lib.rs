@@ -492,26 +492,82 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
             cache_dir: Some(cache.clone()),
             scripts_dir: Some(scripts.clone()),
         };
-        let day = camprender::render(&r, &|p, step| emit(p * render_end / 100, format!("Render: {step}")), &camprender::CANCEL)?;
-        let night_png = night.then(|| work.join("night.png"));
-        let night_end = render_end;
-        let input = campbuild::BuildInput {
-            map: docs.join("maps").join(format!("{map_id}.json")),
-            walk: Some(docs.join("maps").join(format!("{map_id}_walk.json"))).filter(|p| p.exists()),
-            render: day.out_png.clone(),
-            alpha: day.alpha_png.clone(),
-            id: day.id_png.clone(),
-            night: night_png,
-            models: campbuild::Models::Dir(lib.join("proxies")),
-        };
-        let mode = if sadoqol {
-            campbuild::Mode::SadoQolCamp { template_dir: PathBuf::from(SADOQOL_CAMP_TEMPLATE) }
-        } else {
-            campbuild::Mode::Generic
-        };
-        let opts = campbuild::BuildOptions { name, mode, out_dir: out_dir.clone() };
-        let rep = campbuild::build(&input, &opts, &|p, step| emit(night_end + p * (100 - night_end) / 100, format!("Area: {step}")))?;
+        camprender::render(&r, &|p, step| emit(p * render_end / 100, format!("Render: {step}")), &camprender::CANCEL)?;
+        let last = LastRender { name, target: req.target.clone(), night };
+        let rep = build_area(&docs, &work, &lib, &map_id, &last, &out_dir, &|p, step| emit(render_end + p * (100 - render_end) / 100, step))?;
         emit(100, "Done".into());
+        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, walls: rep.walls, seconds: started.elapsed().as_secs() })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// what the last render of a map made (kept next to its pictures): the Walls tool rebuilds the area from them
+#[derive(Serialize, serde::Deserialize, Clone)]
+struct LastRender {
+    name: String,
+    target: String,
+    night: bool,
+}
+
+/// the area from the render pictures in `work` (day.png + passes, night.png), and the walls file for the editor
+fn build_area(
+    docs: &Path,
+    work: &Path,
+    lib: &Path,
+    map_id: &str,
+    last: &LastRender,
+    out_dir: &Path,
+    progress: &(dyn Fn(u32, String) + Sync),
+) -> Res<campbuild::BuildReport> {
+    let input = campbuild::BuildInput {
+        map: docs.join("maps").join(format!("{map_id}.json")),
+        walk: Some(docs.join("maps").join(format!("{map_id}_walk.json"))).filter(|p| p.exists()),
+        render: work.join("day.png"),
+        alpha: Some(work.join("day_alpha.png")),
+        id: Some(work.join("day_id.png")),
+        night: last.night.then(|| work.join("night.png")),
+        models: campbuild::Models::Dir(lib.join("proxies")),
+    };
+    let mode = if last.target == "sadoqol" {
+        campbuild::Mode::SadoQolCamp { template_dir: PathBuf::from(SADOQOL_CAMP_TEMPLATE) }
+    } else {
+        campbuild::Mode::Generic
+    };
+    let opts = campbuild::BuildOptions { name: last.name.clone(), mode, out_dir: out_dir.to_path_buf() };
+    let rep = campbuild::build(&input, &opts, &|p, step| progress(p, format!("Area: {step}")))?;
+    let walls = serde_json::json!({ "last": last, "auto": rep.auto_walls, "made": rep.walls });
+    std::fs::write(work.join("walls.json"), walls.to_string()).map_err(|e| e.to_string())?;
+    Ok(rep)
+}
+
+/// the Walls tool: each piece's traced walls from the map's last render (null before any render)
+#[tauri::command]
+fn camp3d_walls(app: tauri::AppHandle, map_id: String) -> Res<Option<serde_json::Value>> {
+    let p = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&map_id).join("walls.json");
+    match std::fs::read_to_string(&p) {
+        Ok(t) => serde_json::from_str(&t).map(Some).map_err(|e| e.to_string()),
+        Err(_) => Ok(None),
+    }
+}
+
+/// the Walls tool's "Rebuild area": the last render's pictures, the map's current walls and spots, no Blender (seconds)
+#[tauri::command]
+async fn camp3d_rebuild_area(app: tauri::AppHandle, map_id: String) -> Res<RenderAreaReport> {
+    let work = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&map_id);
+    let t = std::fs::read_to_string(work.join("walls.json")).map_err(|_| "render this map once first".to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
+    let last: LastRender = serde_json::from_value(v["last"].clone()).map_err(|e| e.to_string())?;
+    let s = load_settings(&app);
+    let out_dir = PathBuf::from(&s.project_dir).join(&last.name);
+    if is_blocked(&s, &out_dir) {
+        return Err(format!("{} is a protected folder", out_dir.display()));
+    }
+    let lib = library_dir(&app);
+    let docs = camp3d::root(&app)?;
+    let started = std::time::Instant::now();
+    tauri::async_runtime::spawn_blocking(move || -> Res<RenderAreaReport> {
+        let rep = build_area(&docs, &work, &lib, &map_id, &last, &out_dir, &|_, _| {})?;
         Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, walls: rep.walls, seconds: started.elapsed().as_secs() })
     })
     .await
@@ -563,6 +619,8 @@ pub fn run() {
             camprender::camprender_run,
             camprender::camprender_cancel,
             camp3d_render_area,
+            camp3d_walls,
+            camp3d_rebuild_area,
             camp3d_render_cancel
         ])
         .run(tauri::generate_context!())

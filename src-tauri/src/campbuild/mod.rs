@@ -104,10 +104,22 @@ pub struct BuildReport {
     pub entry_moved: Option<[i32; 2]>,
     /// a generic area: the game console line that takes the party to its arrival point (also in HOW_TO_TEST.txt)
     pub console: Option<String>,
+    /// the traced walls of each piece, before edits: for the editor's Walls tool
+    #[serde(skip)]
+    pub auto_walls: Vec<AutoWall>,
     pub ms: u64,
 }
 
 pub type Pt = (i32, i32);
+
+/// one piece's traced walls (area pixels), with its ground point at build time
+#[derive(Serialize, Clone, Debug)]
+pub struct AutoWall {
+    pub i: usize,
+    pub id: Option<String>,
+    pub g: Pt,
+    pub pts: Vec<Vec<Pt>>,
+}
 
 /// a spot in area pixels; facing for the ones that have one
 #[derive(Clone, Copy, Debug)]
@@ -219,6 +231,11 @@ struct Item<'a> {
     s: f64,
     sz: [f64; 3],
     bam: Option<&'a str>,
+    /// the editor's piece id (wall edits follow the piece, not its place in the list)
+    id: Option<&'a str>,
+    /// the editor's wall edit for this piece: {"off": true}, or {"pts": [[[dx, dy], ...], ...]} in area pixels from
+    /// the piece's ground point
+    wall: Option<&'a Value>,
 }
 
 fn items(doc: &Value) -> Vec<Item<'_>> {
@@ -244,6 +261,8 @@ fn items(doc: &Value) -> Vec<Item<'_>> {
                         s: it.get("s").map(num).unwrap_or(1.0),
                         sz: [sz[0], sz[1], sz[2]],
                         bam: it.get("bam").and_then(|v| v.as_str()),
+                        id: it.get("id").and_then(|v| v.as_str()),
+                        wall: it.get("wall").filter(|w| w.is_object()),
                     }
                 })
                 .collect()
@@ -374,7 +393,21 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     progress(35, "Walls");
     let alpha = input.alpha.clone().unwrap_or_else(|| sibling(&input.render, "_alpha"));
     let id = input.id.clone().unwrap_or_else(|| sibling(&input.render, "_id"));
-    let walls = walls(&its, &models, &id, &alpha, mw, mh)?;
+    let (mut walls, auto) = walls(&its, &models, &id, &alpha, mw, mh, pxm, pxm * se)?;
+    // walls drawn by hand in the editor, not tied to a piece: their ground line is their bottom
+    for poly in doc.get("walls").and_then(|v| v.as_array()).into_iter().flatten() {
+        let v: Vec<Pt> = poly
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p.as_array().map(|p| (pround(num(&p[0])), pround(num(&p[1])))))
+            .collect();
+        if v.len() >= 3 {
+            let yb = v.iter().map(|p| p.1).max().unwrap_or(0);
+            walls.push(baseline(v, yb));
+        }
+    }
+    report.auto_walls = auto;
     report.walls = walls.len();
     write(format!("{name}.WED"), &files::wed(tw, th, &walls, &name))?;
 
@@ -616,7 +649,9 @@ fn search_map(
 // ---------------------------------------------------------------- walls
 
 /// wall polygons: per piece taller than MIN_HEIGHT, its pixels in the id pass where the coverage pass is solid,
-/// closed 5x5 (leaf gaps: one shape), outer contours, Douglas-Peucker 2 px, area >= 80
+/// closed 5x5 (leaf gaps: one shape), outer contours, Douglas-Peucker 2 px, area >= 80, then anchored on the piece's
+/// ground line (`baseline`). `xpm` / `ypm`: area pixels per metre across / in depth. A piece's wall edit replaces
+/// its traced walls. Returns the walls and, for the editor, each piece's traced ones
 fn walls(
     its: &[Item],
     models: &HashMap<String, Model>,
@@ -624,7 +659,9 @@ fn walls(
     alpha: &Path,
     w: usize,
     h: usize,
-) -> Result<Vec<Vec<Pt>>, String> {
+    xpm: f64,
+    ypm: f64,
+) -> Result<(Vec<Vec<Pt>>, Vec<AutoWall>), String> {
     let ids = image::open(id).map_err(|e| format!("{}: {e}", id.display()))?.to_rgb8();
     let cov = image::open(alpha).map_err(|e| format!("{}: {e}", alpha.display()))?.to_rgba8();
     for (p, im) in [(id, (ids.width(), ids.height())), (alpha, (cov.width(), cov.height()))] {
@@ -660,25 +697,80 @@ fn walls(
             b.4 = b.4.max(y);
         }
     }
-    let per: Vec<Vec<Vec<Pt>>> = (0..n)
+    let per: Vec<(Vec<Vec<Pt>>, Option<AutoWall>)> = (0..n)
         .into_par_iter()
         .map(|k| {
             let it = &its[k];
-            let Some(m) = models.get(it.m) else { return Vec::new() };
-            let ht = m.dims[2] * it.s * it.sz[1];
-            let b = boxes[k + 1];
-            if ht < MIN_HEIGHT || NOBLOCK.contains(&m.label.as_str()) || b.0 < MIN_PIXELS {
-                return Vec::new();
-            }
-            contour::piece_contours(&label, w, h, (k + 1) as u32, [b.1, b.2, b.3, b.4], 2)
-                .into_iter()
-                .filter(|c| contour::area(c) >= MIN_AREA)
-                .map(|c| contour::approx_closed(&c, DP_EPS))
-                .filter(|a| a.len() >= 3)
-                .collect()
+            let g = (pround(it.p[0] * xpm), pround(it.p[2] * ypm));
+            let traced: Vec<Vec<Pt>> = match models.get(it.m) {
+                Some(m) => {
+                    let ht = m.dims[2] * it.s * it.sz[1];
+                    let b = boxes[k + 1];
+                    if ht < MIN_HEIGHT || NOBLOCK.contains(&m.label.as_str()) || b.0 < MIN_PIXELS {
+                        Vec::new()
+                    } else {
+                        contour::piece_contours(&label, w, h, (k + 1) as u32, [b.1, b.2, b.3, b.4], 2)
+                            .into_iter()
+                            .filter(|c| contour::area(c) >= MIN_AREA)
+                            .map(|c| contour::approx_closed(&c, DP_EPS))
+                            .filter(|a| a.len() >= 3)
+                            .collect()
+                    }
+                }
+                None => Vec::new(),
+            };
+            let edit = it.wall;
+            let off = edit.and_then(|e| e.get("off")).and_then(|v| v.as_bool()) == Some(true);
+            let own: Option<Vec<Vec<Pt>>> = edit.and_then(|e| e.get("pts")).and_then(|v| v.as_array()).map(|polys| {
+                polys
+                    .iter()
+                    .map(|poly| {
+                        poly.as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|p| p.as_array().map(|p| (g.0 + pround(num(&p[0])), g.1 + pround(num(&p[1])))))
+                            .collect::<Vec<Pt>>()
+                    })
+                    .filter(|v| v.len() >= 3)
+                    .collect()
+            });
+            let used = if off { Vec::new() } else { own.unwrap_or_else(|| traced.clone()) };
+            let auto = (!traced.is_empty()).then(|| AutoWall { i: k, id: it.id.map(String::from), g, pts: traced });
+            (used.into_iter().map(|v| baseline(v, g.1)).collect(), auto)
         })
         .collect();
-    Ok(per.into_iter().flatten().collect())
+    let mut out = Vec::new();
+    let mut autos = Vec::new();
+    for (v, a) in per {
+        out.extend(v);
+        autos.extend(a);
+    }
+    Ok((out, autos))
+}
+
+/// The engine tells "behind the wall" from the line between a wall's leftmost and its rightmost vertex: a character
+/// above that line (further away) is hidden. A traced outline has those two points anywhere (a tent's left foot and
+/// right roof edge: the line slanted, and a character behind the tent's right half stood "in front"). Two thin spikes,
+/// 2 px out on each side at the piece's ground row `yb`, make that line the piece's own ground line; they add no area.
+fn baseline(mut v: Vec<Pt>, yb: i32) -> Vec<Pt> {
+    let (x0, x1) = (v.iter().map(|p| p.0).min().unwrap_or(0), v.iter().map(|p| p.0).max().unwrap_or(0));
+    let (y0, y1) = (v.iter().map(|p| p.1).min().unwrap_or(0), v.iter().map(|p| p.1).max().unwrap_or(0));
+    let yb = yb.clamp(y0, y1);
+    let mid = (x0 + x1) / 2;
+    // the vertex on each side nearest to the ground row (left: the leftmost of the ties)
+    let pick = |left: bool| -> usize {
+        (0..v.len())
+            .filter(|&i| if left { v[i].0 <= mid } else { v[i].0 >= mid })
+            .min_by_key(|&i| ((v[i].1 - yb).abs(), if left { v[i].0 } else { -v[i].0 }))
+            .unwrap_or(0)
+    };
+    let (il, ir) = (pick(true), pick(false));
+    // insert the later index first so the earlier one stays valid
+    for (i, x) in if il > ir { [(il, x0 - 2), (ir, x1 + 2)] } else { [(ir, x1 + 2), (il, x0 - 2)] } {
+        let p = v[i];
+        v.splice(i + 1..i + 1, [(x, yb), p]);
+    }
+    v
 }
 
 #[cfg(test)]
@@ -691,5 +783,16 @@ mod tests {
         assert!(validate_name("AR990").is_err());
         assert!(validate_name("AR99-0").is_err());
         assert_eq!(title("lamp post"), "Lamp_Post");
+    }
+
+    #[test]
+    fn baseline_spikes() {
+        // a tent-like outline: its left foot low, its right side high
+        let v = vec![(0, 100), (0, 20), (50, 0), (100, 20), (100, 60)];
+        let b = baseline(v, 80);
+        let left = b.iter().min_by_key(|p| p.0).unwrap();
+        let right = b.iter().max_by_key(|p| p.0).unwrap();
+        assert_eq!((*left, *right), ((-2, 80), (102, 80)));
+        assert_eq!(b.len(), 9);
     }
 }
