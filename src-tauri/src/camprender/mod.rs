@@ -488,11 +488,11 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
 // Tauri commands
 // ---------------------------------------------------------------------------------------------------------------
 
-static CANCEL: AtomicBool = AtomicBool::new(false);
+pub static CANCEL: AtomicBool = AtomicBool::new(false);
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// the bundled scripts (resource `blender/`), else the source tree's
-fn scripts_dir(app: &tauri::AppHandle) -> PathBuf {
+pub fn scripts_dir(app: &tauri::AppHandle) -> PathBuf {
     use tauri::Manager;
     app.path()
         .resolve("blender", tauri::path::BaseDirectory::Resource)

@@ -386,6 +386,114 @@ async fn campbuild_run(app: tauri::AppHandle, input: campbuild::BuildInput, opts
     .map_err(|e| e.to_string())?
 }
 
+#[derive(Deserialize)]
+struct RenderAreaReq {
+    map_id: String,
+    /// 6 characters, e.g. AR9900
+    name: String,
+    night: bool,
+    samples: u32,
+}
+
+#[derive(Serialize)]
+struct RenderAreaReport {
+    out_dir: String,
+    files: Vec<String>,
+    walls: usize,
+    seconds: u64,
+}
+
+#[derive(Serialize, Clone)]
+struct RenderAreaProgress {
+    pct: u32,
+    step: String,
+}
+
+/// "Render area" in the Camp 3D page: the day picture with its coverage and id passes, the night one, then the area
+/// build, into <project>/<NAME>. One event stream "render-progress" covers the three steps.
+#[tauri::command]
+async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<RenderAreaReport> {
+    use tauri::Emitter;
+    let name = req.name.trim().to_ascii_uppercase();
+    if name.len() != 6 || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
+        return Err("the area name needs exactly 6 letters or digits".into());
+    }
+    let s = load_settings(&app);
+    let out_dir = PathBuf::from(&s.project_dir).join(&name);
+    if is_blocked(&s, &out_dir) {
+        return Err(format!("{} is a protected folder", out_dir.display()));
+    }
+    let lib = library_dir(&app);
+    if !library::is_library(&lib) {
+        return Err("the model library is not downloaded yet".into());
+    }
+    let docs = camp3d::root(&app)?;
+    let read = |doc: &str| -> Res<serde_json::Value> {
+        let p = docs.join("maps").join(format!("{doc}.json"));
+        let t = std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+        serde_json::from_str(&t).map_err(|e| e.to_string())
+    };
+    let map_doc = read(&req.map_id)?;
+    let ground_doc = read(&format!("{}_ground", req.map_id))?;
+    let layers = ground_doc.get("layers").and_then(|l| l.as_array()).map(|l| l.len()).unwrap_or(0);
+    let ground_masks: Vec<serde_json::Value> = (0..layers).map(|i| read(&format!("{}_g{i}", req.map_id)).unwrap_or(serde_json::Value::Null)).collect();
+    let offsets = std::fs::read_to_string(docs.join("models").join("offsets.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
+    let work = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&req.map_id);
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    let blender = if s.blender_exe.is_empty() { None } else { Some(PathBuf::from(&s.blender_exe)) };
+    let scripts = camprender::scripts_dir(&app);
+    let (night, samples, map_id) = (req.night, req.samples.clamp(4, 1024), req.map_id.clone());
+    let started = std::time::Instant::now();
+    camprender::CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || -> Res<RenderAreaReport> {
+        let emit = |pct: u32, step: String| {
+            let _ = app.emit("render-progress", RenderAreaProgress { pct, step });
+        };
+        // shares of the bar: day render (with its passes) is the longest
+        let (day_end, night_end) = if night { (55, 90) } else { (90, 90) };
+        let one = |out: &str, hour: f32, id_pass: bool, from: u32, to: u32, label: &str| -> Res<camprender::RenderReport> {
+            let r = camprender::RenderRequest {
+                map_doc: map_doc.clone(),
+                ground_doc: ground_doc.clone(),
+                ground_masks: ground_masks.clone(),
+                offsets: offsets.clone(),
+                out_png: work.join(out),
+                samples,
+                hour: Some(hour),
+                id_pass,
+                crop: None,
+                blender_exe: blender.clone(),
+                library_dir: lib.clone(),
+                work_dir: work.join("prep"),
+                scripts_dir: Some(scripts.clone()),
+            };
+            camprender::render(&r, &|p, step| emit(from + p * (to - from) / 100, format!("{label}: {step}")), &camprender::CANCEL)
+        };
+        let day = one("day.png", 14.0, true, 0, day_end, "Day")?;
+        let night_png = if night { Some(one("night.png", 22.0, false, day_end, night_end, "Night")?.out_png) } else { None };
+        let input = campbuild::BuildInput {
+            map: docs.join("maps").join(format!("{map_id}.json")),
+            walk: Some(docs.join("maps").join(format!("{map_id}_walk.json"))).filter(|p| p.exists()),
+            render: day.out_png.clone(),
+            alpha: day.alpha_png.clone(),
+            id: day.id_png.clone(),
+            night: night_png,
+            models: campbuild::Models::Dir(lib.join("proxies")),
+        };
+        let opts = campbuild::BuildOptions { name, mode: campbuild::Mode::Generic, out_dir: out_dir.clone() };
+        let rep = campbuild::build(&input, &opts, &|p, step| emit(night_end + p * (100 - night_end) / 100, format!("Area: {step}")))?;
+        emit(100, "Done".into());
+        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, walls: rep.walls, seconds: started.elapsed().as_secs() })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn camp3d_render_cancel() {
+    camprender::CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = App::default();
@@ -423,7 +531,9 @@ pub fn run() {
             campbuild_run,
             camprender::camprender_find_blender,
             camprender::camprender_run,
-            camprender::camprender_cancel
+            camprender::camprender_cancel,
+            camp3d_render_area,
+            camp3d_render_cancel
         ])
         .run(tauri::generate_context!())
         .expect("error while running MapSmithEE");
