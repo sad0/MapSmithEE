@@ -393,7 +393,13 @@ struct RenderAreaReq {
     name: String,
     night: bool,
     samples: u32,
+    /// "generic" (a self-contained area named `name`) or "sadoqol" (SadoQoL's camp SQCAMP, from its template)
+    #[serde(default)]
+    target: String,
 }
+
+/// SadoQoL's camp files the SQCAMP build starts from (read only)
+const SADOQOL_CAMP_TEMPLATE: &str = "E:/Enhanced Edition/Environnement de test/EET 2.7.3 (dev)/SadoQoL/camp";
 
 #[derive(Serialize)]
 struct RenderAreaReport {
@@ -414,7 +420,8 @@ struct RenderAreaProgress {
 #[tauri::command]
 async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<RenderAreaReport> {
     use tauri::Emitter;
-    let name = req.name.trim().to_ascii_uppercase();
+    let sadoqol = req.target == "sadoqol";
+    let name = if sadoqol { "SQCAMP".to_string() } else { req.name.trim().to_ascii_uppercase() };
     if name.len() != 6 || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
         return Err("the area name needs exactly 6 letters or digits".into());
     }
@@ -442,6 +449,7 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
     std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
     let blender = if s.blender_exe.is_empty() { None } else { Some(PathBuf::from(&s.blender_exe)) };
     let scripts = camprender::scripts_dir(&app);
+    let cache = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join("model-cache");
     let (night, samples, map_id) = (req.night, req.samples.clamp(4, 1024), req.map_id.clone());
     let started = std::time::Instant::now();
     camprender::CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -449,28 +457,29 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
         let emit = |pct: u32, step: String| {
             let _ = app.emit("render-progress", RenderAreaProgress { pct, step });
         };
-        // shares of the bar: day render (with its passes) is the longest
-        let (day_end, night_end) = if night { (55, 90) } else { (90, 90) };
-        let one = |out: &str, hour: f32, id_pass: bool, from: u32, to: u32, label: &str| -> Res<camprender::RenderReport> {
-            let r = camprender::RenderRequest {
-                map_doc: map_doc.clone(),
-                ground_doc: ground_doc.clone(),
-                ground_masks: ground_masks.clone(),
-                offsets: offsets.clone(),
-                out_png: work.join(out),
-                samples,
-                hour: Some(hour),
-                id_pass,
-                crop: None,
-                blender_exe: blender.clone(),
-                library_dir: lib.clone(),
-                work_dir: work.join("prep"),
-                scripts_dir: Some(scripts.clone()),
-            };
-            camprender::render(&r, &|p, step| emit(from + p * (to - from) / 100, format!("{label}: {step}")), &camprender::CANCEL)
+        // one Blender session renders the day picture with its passes and the night one: the models load once, and
+        // from the cache of earlier renders when they are there
+        let render_end = 90;
+        let r = camprender::RenderRequest {
+            map_doc: map_doc.clone(),
+            ground_doc: ground_doc.clone(),
+            ground_masks: ground_masks.clone(),
+            offsets: offsets.clone(),
+            out_png: work.join("day.png"),
+            samples,
+            hour: Some(14.0),
+            id_pass: true,
+            crop: None,
+            blender_exe: blender.clone(),
+            library_dir: lib.clone(),
+            work_dir: work.join("prep"),
+            also: if night { vec![camprender::AlsoRender { out_png: work.join("night.png"), hour: 22.0 }] } else { vec![] },
+            cache_dir: Some(cache.clone()),
+            scripts_dir: Some(scripts.clone()),
         };
-        let day = one("day.png", 14.0, true, 0, day_end, "Day")?;
-        let night_png = if night { Some(one("night.png", 22.0, false, day_end, night_end, "Night")?.out_png) } else { None };
+        let day = camprender::render(&r, &|p, step| emit(p * render_end / 100, format!("Render: {step}")), &camprender::CANCEL)?;
+        let night_png = night.then(|| work.join("night.png"));
+        let night_end = render_end;
         let input = campbuild::BuildInput {
             map: docs.join("maps").join(format!("{map_id}.json")),
             walk: Some(docs.join("maps").join(format!("{map_id}_walk.json"))).filter(|p| p.exists()),
@@ -480,7 +489,12 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
             night: night_png,
             models: campbuild::Models::Dir(lib.join("proxies")),
         };
-        let opts = campbuild::BuildOptions { name, mode: campbuild::Mode::Generic, out_dir: out_dir.clone() };
+        let mode = if sadoqol {
+            campbuild::Mode::SadoQolCamp { template_dir: PathBuf::from(SADOQOL_CAMP_TEMPLATE) }
+        } else {
+            campbuild::Mode::Generic
+        };
+        let opts = campbuild::BuildOptions { name, mode, out_dir: out_dir.clone() };
         let rep = campbuild::build(&input, &opts, &|p, step| emit(night_end + p * (100 - night_end) / 100, format!("Area: {step}")))?;
         emit(100, "Done".into());
         Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, walls: rep.walls, seconds: started.elapsed().as_secs() })

@@ -1,11 +1,39 @@
 # One model, loaded the way the editor sees it: every part joined into one mesh, fitted to its real-world size,
 # centred on x/y and standing on z = 0. Shared by proxy.py (light editor copy) and render_map.py (full render).
-import bpy, os, sys
+import bpy, hashlib, json, os, sys
 from mathutils import Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import ASSETS, lib
 
+# MAPSMITH_CACHE: a folder of models already loaded and fitted, one .blend each (key: the model's entry), so a later
+# render appends them in seconds instead of importing the full file again. Tents and log seats are built, not read:
+# quick, and left out.
+CACHE = os.environ.get('MAPSMITH_CACHE', '').replace(chr(92), '/').rstrip('/')
+CACHE_VERSION = 1
+
+
 def load(M, name='model'):
+    src = M['src']
+    if not CACHE or 'tent' in src or 'logseat' in src:
+        return _load(M, name)
+    key = hashlib.sha1((json.dumps(M, sort_keys=True) + str(CACHE_VERSION)).encode()).hexdigest()[:16]
+    f = f'{CACHE}/{name}-{key}.blend'
+    if os.path.exists(f):
+        with bpy.data.libraries.load(f, link=False) as (have, want):
+            want.objects = [n for n in have.objects if n == name][:1]
+        if want.objects and want.objects[0]:
+            ob = want.objects[0]
+            bpy.context.scene.collection.objects.link(ob)
+            return ob
+    ob = _load(M, name)
+    os.makedirs(CACHE, exist_ok=True)
+    tmp = f'{f}.tmp'
+    bpy.data.libraries.write(tmp, {ob}, path_remap='ABSOLUTE', compress=False)
+    os.replace(tmp, f)
+    return ob
+
+
+def _load(M, name='model'):
     sc = bpy.context.scene
     before = set(bpy.data.objects)
     src = M['src']

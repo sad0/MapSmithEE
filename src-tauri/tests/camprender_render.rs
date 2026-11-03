@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 
-use mapsmithee_lib::camprender::{RenderRequest, find_blender, render};
+use mapsmithee_lib::camprender::{AlsoRender, RenderRequest, find_blender, render};
 use serde_json::Value;
 
 fn read(p: &std::path::Path) -> Value {
@@ -44,6 +44,11 @@ fn render_sample_map() {
         blender_exe: None,
         library_dir: PathBuf::from(var("MAPSMITH_LIBRARY")),
         work_dir: out.parent().unwrap().join("work"),
+        // MAPSMITH_ALSO_HOUR: a second picture (e.g. 22 for night) from the same session; MAPSMITH_CACHE_DIR: model cache
+        also: std::env::var("MAPSMITH_ALSO_HOUR").ok().and_then(|h| h.parse().ok()).map(|hour| {
+            vec![AlsoRender { out_png: out.with_file_name("also.png"), hour }]
+        }).unwrap_or_default(),
+        cache_dir: std::env::var("MAPSMITH_CACHE_DIR").ok().map(PathBuf::from),
         scripts_dir: None,
     };
     println!("blender: {:?}", find_blender());

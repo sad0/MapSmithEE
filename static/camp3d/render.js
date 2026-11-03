@@ -30,7 +30,8 @@
   const box = document.createElement('div'); box.id = 'rdBack';
   box.innerHTML = `<div id="rdBox" role="dialog" aria-modal="true" aria-labelledby="rdTitle">
     <h2 id="rdTitle">Render area</h2>
-    <label>Area name <input type="text" id="rdName" maxlength="6" spellcheck="false" placeholder="AR9900"></label>
+    <label>Build for <select id="rdTarget"><option value="generic">A new area</option><option value="sadoqol">SadoQoL camp (SQCAMP)</option></select></label>
+    <label id="rdNameRow">Area name <input type="text" id="rdName" maxlength="6" spellcheck="false" placeholder="AR9900"></label>
     <label class="chk"><input type="checkbox" id="rdNight" checked> Night version too</label>
     <label>Quality <select id="rdQ"><option value="16">Draft (fast)</option><option value="64" selected>Good</option><option value="128">Final</option></select></label>
     <div class="note" id="rdLib">Checking the model library…</div>
@@ -47,11 +48,14 @@
   const validName = s => /^[A-Z0-9_#-]{6}$/.test(s);
 
   function refreshGo() {
+    const sq = $('rdTarget').value === 'sadoqol';
+    $('rdNameRow').style.display = sq ? 'none' : '';
     const n = $('rdName').value.trim().toUpperCase();
-    $('rdGo').disabled = busy || !libOk || !blOk || !validName(n);
+    $('rdGo').disabled = busy || !libOk || !blOk || (!sq && !validName(n));
     $('rdName').title = validName(n) ? '' : 'Exactly 6 characters (the game names the PVRZ pages after it)';
   }
   $('rdName').oninput = refreshGo;
+  $('rdTarget').onchange = refreshGo;
 
   async function check() {
     try {
@@ -93,7 +97,8 @@
   };
 
   $('rdGo').onclick = async () => {
-    const name = $('rdName').value.trim().toUpperCase();
+    const target = $('rdTarget').value;
+    const name = target === 'sadoqol' ? 'SQCAMP' : $('rdName').value.trim().toUpperCase();
     if (!validName(name)) return;
     try { localStorage.setItem('mapsmithee.render.' + mapId, name); } catch {}
     busy = true; refreshGo(); $('rdCancel').textContent = 'Stop';
@@ -101,7 +106,7 @@
     const un = await listen('render-progress', ev => setBar(ev.payload.pct, ev.payload.step));
     try {
       await save(); await saveGround();
-      const r = await invoke('camp3d_render_area', { req: { map_id: mapId, name, night: $('rdNight').checked, samples: +$('rdQ').value } });
+      const r = await invoke('camp3d_render_area', { req: { map_id: mapId, name, night: $('rdNight').checked, samples: +$('rdQ').value, target } });
       lastOut = r.out_dir;
       setBar(100, `Done: ${r.files.length} files in ${r.out_dir}`);
       $('rdGo').textContent = 'Render again';

@@ -20,6 +20,10 @@ if G.get('split'):
     G['masks'] = [(lambda f: (lambda d: d.get('data', d).get('mask'))(json.load(open(f))) if os.path.exists(f) else None)(f'{base}_g{i}.json') for i in range(len(G['layers']))]
 SAMPLES = int(a[3]) if len(a) > 3 else 128
 HOUR = float(a[4]) if len(a) > 4 and a[4] != '-' else L.get('time', 14)
+# several pictures from one loaded scene (MapSmithEE: night, then day with its passes): MAPSMITH_JOBS =
+# [{"out": png, "hour": h, "id": bool}, ...]; without it, the one picture of the command line
+JOBS = json.loads(os.environ['MAPSMITH_JOBS']) if os.environ.get('MAPSMITH_JOBS') else [{'out': OUT, 'hour': HOUR, 'id': bool(os.environ.get('BG3D_IDPASS'))}]
+JOBS.sort(key=lambda j: bool(j.get('id')))   # the id passes change the render settings: last
 CROP = [int(v) for v in a[5:9]] if len(a) > 8 else None
 MODELS = json.load(open(f'{LIB}/models.json'))
 PROXY_DIMS = {}
@@ -103,7 +107,10 @@ insts = []   # (item index, object) for the id pass
 decals = []  # BG trees' painted shadows: not pieces, left out of the coverage and id passes
 SIN, COS = math.sin(ELEV), math.cos(ELEV)
 _day = max(0, math.sin((HOUR - 6) / 12 * math.pi)); _night = HOUR < 6.5 or HOUR > 20.5
-SPRITE_K = 2 ** 0.4 * (0.3 if _night else min(1.0, 0.6 + _day * 0.6))   # undo the scene's -0.4 exposure; dim by night
+def sprite_k(h):   # undo the scene's -0.4 exposure; dim by night
+    d = max(0, math.sin((h - 6) / 12 * math.pi)); return 2 ** 0.4 * (0.3 if (h < 6.5 or h > 20.5) else min(1.0, 0.6 + d * 0.6))
+SPRITE_K = sprite_k(HOUR)
+SPRITE_EMS = []   # BG trees' emission nodes: their strength follows each picture's hour
 _bgmesh = {}
 # ---------- a piece's own colour (item 'col' = {h, s, b, c}): the editor's CSS filter maths (hue-rotate, saturate,
 # brightness, contrast on sRGB values) as a node group spliced in front of the colour the material shows ----------
@@ -173,7 +180,7 @@ def bgsprite(mid, B, s):
             o_ = n.nodes.new('ShaderNodeOutputMaterial'); tx = n.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(libpath(B[kind]))
             mx = n.nodes.new('ShaderNodeMixShader'); tr = n.nodes.new('ShaderNodeBsdfTransparent')
             if kind == 'tree':   # pre-lit art: emitted as painted
-                em = n.nodes.new('ShaderNodeEmission'); em.inputs['Strength'].default_value = SPRITE_K
+                em = n.nodes.new('ShaderNodeEmission'); em.inputs['Strength'].default_value = SPRITE_K; SPRITE_EMS.append(em)
                 n.links.new(tx.outputs['Color'], em.inputs['Color']); n.links.new(tx.outputs['Alpha'], mx.inputs['Fac'])
                 n.links.new(tr.outputs[0], mx.inputs[1]); n.links.new(em.outputs[0], mx.inputs[2])
             else:                # the shadow darkens the ground beneath it
@@ -228,37 +235,42 @@ for idx, it in enumerate(L['items']):
     insts.append((idx, inst))
 print('placed', len(L['items']), 'items,', len(proto), 'models', flush=True)
 
-# ---------- light: the editor's sun for that hour ----------
-h = HOUR; day = max(0, math.sin((h - 6) / 12 * math.pi))
-# BG's own light (measured on BG1's trees): south-west at 45°, all day; the hour sets colour and strength only
-_hz = Vector((-0.61, 0, 0.79)).normalized() * math.cos(math.pi / 4)
-d3 = Vector((_hz.x, math.sin(math.pi / 4), _hz.z))   # towards the sun, editor axes
-dB = three_to_bl(d3)
-night = h < 6.5 or h > 20.5
-bpy.ops.object.light_add(type='SUN'); sun = bpy.context.object
-sun.rotation_euler = dB.to_track_quat('Z', 'Y').to_euler(); sun.data.angle = math.radians(6)   # soft edges, like BG's painted shadows
-sun.data.energy = 0.35 if night else 1.0 + day * 3.2
-sun.data.color = (0.56, 0.65, 0.85) if night else ((1.0, 0.7, 0.45) if day < 0.35 else (1.0, 0.95, 0.86))
-# fires, braziers, lanterns and torches light the camp (the editor's FIRES table: height share, power): strongly at
-# night, a faint warm halo round their hearths by day (John 2026-11-02)
-# (share of the piece's height, power in W, radius of the light in m: a big source casts soft shadows, as a real
-# metre-wide camp fire does; one wide light, not a ring of small ones, which would cast a star of sharp shadows)
-FIRES = {'campfire': (0.4, 2700, 0.9), 'brazier': (0.9, 900, 0.35), 'forge': (0.8, 900, 0.35), 'torch': (0.85, 400, 0.25),
-         'lantern': (0.7, 150, 0.15), 'lamp post': (0.9, 300, 0.2)}
-DAYK = 1.0 if night else 0.05
-nf = 0
-for it in L['items']:
-    m = MODELS.get(it['m']); f = m and FIRES.get(m['label'])
-    if not f: continue
-    s_ = it.get('s', 1); dims = PROXY_DIMS.get(it['m'], [1, 1, 1])
-    bpy.ops.object.light_add(type='POINT'); l = bpy.context.object
-    # at least 0.7 m up: a light sitting in the pit burns its stones white
-    l.location = three_to_bl(it['p']) + Vector((0, 0, max(0.7, f[0] * dims[2] * s_)))
-    l.data.energy = f[1] * s_ * DAYK; l.data.color = (1.0, 0.52, 0.2); l.data.shadow_soft_size = f[2] * s_; nf += 1
-print('fire lights', nf, flush=True)
-w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
-w.node_tree.nodes['Background'].inputs[0].default_value = (0.04, 0.05, 0.1, 1) if night else (0.5, 0.56, 0.68, 1)
-w.node_tree.nodes['Background'].inputs[1].default_value = 0.35 if night else 0.9
+# ---------- light: the editor's sun for that hour (rebuilt for each picture) ----------
+_lights = []
+def light(h):
+    for o in _lights: bpy.data.objects.remove(o, do_unlink=True)
+    _lights.clear()
+    day = max(0, math.sin((h - 6) / 12 * math.pi))
+    # BG's own light (measured on BG1's trees): south-west at 45°, all day; the hour sets colour and strength only
+    _hz = Vector((-0.61, 0, 0.79)).normalized() * math.cos(math.pi / 4)
+    d3 = Vector((_hz.x, math.sin(math.pi / 4), _hz.z))   # towards the sun, editor axes
+    dB = three_to_bl(d3)
+    night = h < 6.5 or h > 20.5
+    bpy.ops.object.light_add(type='SUN'); sun = bpy.context.object; _lights.append(sun)
+    sun.rotation_euler = dB.to_track_quat('Z', 'Y').to_euler(); sun.data.angle = math.radians(6)   # soft edges, like BG's painted shadows
+    sun.data.energy = 0.35 if night else 1.0 + day * 3.2
+    sun.data.color = (0.56, 0.65, 0.85) if night else ((1.0, 0.7, 0.45) if day < 0.35 else (1.0, 0.95, 0.86))
+    # fires, braziers, lanterns and torches light the camp (the editor's FIRES table: height share, power): strongly at
+    # night, a faint warm halo round their hearths by day (John 2026-11-02)
+    # (share of the piece's height, power in W, radius of the light in m: a big source casts soft shadows, as a real
+    # metre-wide camp fire does; one wide light, not a ring of small ones, which would cast a star of sharp shadows)
+    FIRES = {'campfire': (0.4, 2700, 0.9), 'brazier': (0.9, 900, 0.35), 'forge': (0.8, 900, 0.35), 'torch': (0.85, 400, 0.25),
+             'lantern': (0.7, 150, 0.15), 'lamp post': (0.9, 300, 0.2)}
+    DAYK = 1.0 if night else 0.05
+    nf = 0
+    for it in L['items']:
+        m = MODELS.get(it['m']); f = m and FIRES.get(m['label'])
+        if not f: continue
+        s_ = it.get('s', 1); dims = PROXY_DIMS.get(it['m'], [1, 1, 1])
+        bpy.ops.object.light_add(type='POINT'); l = bpy.context.object; _lights.append(l)
+        # at least 0.7 m up: a light sitting in the pit burns its stones white
+        l.location = three_to_bl(it['p']) + Vector((0, 0, max(0.7, f[0] * dims[2] * s_)))
+        l.data.energy = f[1] * s_ * DAYK; l.data.color = (1.0, 0.52, 0.2); l.data.shadow_soft_size = f[2] * s_; nf += 1
+    print('fire lights', nf, flush=True)
+    w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
+    w.node_tree.nodes['Background'].inputs[0].default_value = (0.04, 0.05, 0.1, 1) if night else (0.5, 0.56, 0.68, 1)
+    w.node_tree.nodes['Background'].inputs[1].default_value = 0.35 if night else 0.9
+    for em in SPRITE_EMS: em.inputs['Strength'].default_value = sprite_k(h)
 
 # ---------- camera: BG's ----------
 bpy.ops.object.camera_add(); cam = bpy.context.object; sc.camera = cam
@@ -271,12 +283,15 @@ if CROP:
     x0, y0, x1, y1 = CROP
     sc.render.border_min_x, sc.render.border_max_x = x0 / MAPW, x1 / MAPW
     sc.render.border_min_y, sc.render.border_max_y = 1 - y1 / MAPH, 1 - y0 / MAPH
-sc.render.image_settings.file_format = 'PNG'; sc.render.filepath = OUT
-print('MAPSMITH stage render', flush=True)
-bpy.ops.render.render(write_still=True)
-print('rendered', OUT, flush=True)
-
-if os.environ.get('BG3D_IDPASS'):
+sc.render.image_settings.file_format = 'PNG'
+for k, job in enumerate(JOBS):
+    OUT = job['out']; light(float(job['hour']) if job.get('hour') is not None else HOUR)
+    print(f"MAPSMITH job {k + 1}/{len(JOBS)}", flush=True)
+    sc.render.filepath = OUT
+    print('MAPSMITH stage render', flush=True)
+    bpy.ops.render.render(write_still=True)
+    print('rendered', OUT, flush=True)
+    if not job.get('id'): continue
     # 1) coverage: the pieces alone (ground hidden), transparent background; the alpha keeps leaf cards' real holes
     for d_ in decals: d_.hide_render = True
     gnd.hide_render = True; sc.render.film_transparent = True; sc.cycles.samples = 16; sc.cycles.use_denoising = False

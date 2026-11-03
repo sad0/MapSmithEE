@@ -21,7 +21,13 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct AlsoRender {
+    pub out_png: PathBuf,
+    pub hour: f32,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RenderRequest {
     /// the editor's `maps/<id>` document (raw data or wrapped `{id, data, version}`)
     pub map_doc: Value,
@@ -51,6 +57,12 @@ pub struct RenderRequest {
     pub blender_exe: Option<PathBuf>,
     pub library_dir: PathBuf,
     pub work_dir: PathBuf,
+    /// more pictures from the same loaded scene (e.g. the night one): models are read once
+    #[serde(default)]
+    pub also: Vec<AlsoRender>,
+    /// models already loaded and fitted, kept between renders (.blend per model); none when None
+    #[serde(default)]
+    pub cache_dir: Option<PathBuf>,
     /// folder holding render_map.py and its modules; the source tree's `resources/blender` when None
     #[serde(default)]
     pub scripts_dir: Option<PathBuf>,
@@ -288,6 +300,13 @@ struct Tracker {
     model: String,
     pieces: (u32, u32),
     since: Option<Instant>,
+    /// picture k of n (one Blender session renders them all)
+    job: (u32, u32),
+}
+
+/// a model id as people read it: "ph_fir_tree_01_a" -> "fir tree 01 a" (Objaverse ids stay as they are)
+fn pretty(id: &str) -> String {
+    id.strip_prefix("ph_").unwrap_or(id).replace('_', " ")
 }
 
 /// "Sample 12/128" (Cycles' status line) -> (12, 128)
@@ -301,13 +320,20 @@ fn sample_of(line: &str) -> Option<(u32, u32)> {
 
 impl Tracker {
     /// span of the progress bar for each stage of the Blender run
+    /// the bar from 40 to 99 is shared by the pictures; the last one carries the coverage and id passes
     fn span(&self) -> (u32, u32) {
-        match (self.stage, self.id_pass) {
-            ("render", false) => (40, 99),
-            ("render", true) => (40, 88),
-            ("alpha", _) => (88, 97),
-            ("id", _) => (97, 99),
-            _ => (3, 40),
+        if self.stage == "load" {
+            return (3, 40);
+        }
+        let (k, n) = (self.job.0.max(1), self.job.1.max(1));
+        let (lo, hi) = (40 + 59 * (k - 1) / n, 40 + 59 * k / n);
+        let last = k == n && self.id_pass;
+        let w = hi - lo;
+        match self.stage {
+            "render" if last => (lo, lo + w * 80 / 100),
+            "render" => (lo, hi),
+            "alpha" => (lo + w * 80 / 100, lo + w * 95 / 100),
+            _ => (lo + w * 95 / 100, hi),
         }
     }
 
@@ -318,8 +344,9 @@ impl Tracker {
             // "Mem: 3M | Sample 12/128", "Mem: 1M | Updating Images": the last part says what Blender does
             if let Some((a, b)) = sample_of(st) {
                 let (lo, hi) = self.span();
+                // Cycles ends a pass with "Sample 0/n": the bar never goes back within a stage
                 if self.stage != "load" && b > 0 {
-                    self.pct = lo + (hi - lo) * a.min(b) / b;
+                    self.pct = self.pct.max(lo + (hi - lo) * a.min(b) / b);
                 }
                 self.step = format!("{} (sample {a}/{b})", self.stage_name());
             } else if let Some(last) = st.rsplit('|').next().map(str::trim).filter(|s| !s.is_empty()) {
@@ -334,9 +361,15 @@ impl Tracker {
                         let id = w.next().unwrap_or("");
                         let label = w.collect::<Vec<_>>().join(" ");
                         self.models = (i + 1, n);
-                        self.model = if label.is_empty() { id.to_string() } else { label };
+                        // several models share a label (fir and pine are both "conifer"): show which one
+                        self.model = if label.is_empty() { id.to_string() } else { format!("{label} · {}", pretty(id)) };
                         self.since = Some(Instant::now());
                         self.step = self.load_step();
+                    }
+                }
+                (Some("job"), Some(f)) => {
+                    if let Some((k, n)) = f.split_once('/').and_then(|(k, n)| Some((k.parse::<u32>().ok()?, n.parse::<u32>().ok()?))) {
+                        self.job = (k, n);
                     }
                 }
                 (Some("item"), Some(f)) => {
@@ -448,6 +481,12 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         .env("MAPSMITH_WORK", path_str(&work))
         .env("MAPSMITH_CANVAS", path_str(&prep.canvas_json))
         .env("BG3D_IDPASS", if req.id_pass { "1" } else { "" })
+        .env("MAPSMITH_JOBS", {
+            let mut jobs = vec![json!({"out": path_str(&out), "hour": req.hour, "id": req.id_pass})];
+            jobs.extend(req.also.iter().map(|a| json!({"out": path_str(&a.out_png), "hour": a.hour, "id": false})));
+            json!(jobs).to_string()
+        })
+        .env("MAPSMITH_CACHE", req.cache_dir.as_deref().map(path_str).unwrap_or_default())
         .env("BG3D_PXM", &prep.px_per_m)
         .env("BG3D_TEXFILES", json!(prep.texfiles).to_string())
         .current_dir(&work)
@@ -479,7 +518,7 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
     }
     drop(tx);
 
-    let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None };
+    let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None, job: (1, 1) };
     let mut tail: Vec<String> = Vec::new();
     let mut traceback = false;
     let status = loop {
@@ -595,24 +634,30 @@ mod tests {
 
     #[test]
     fn samples_and_stages() {
-        let mut t = Tracker { id_pass: true, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None };
+        let mut t = Tracker { id_pass: true, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None, job: (1, 1) };
         assert!(t.line("MAPSMITH models 41/82 tent_pup"));
         assert_eq!(t.pct, 22);
         assert_eq!(t.step, "Loading models 42/82 · tent_pup");
         assert!(t.line("MAPSMITH models 42/82 ph_fir_tree_01_a conifer"));
         assert!(t.line("MAPSMITH item 412/1259"));
-        assert_eq!(t.step, "Loading models 43/82 · pieces 412/1259 · conifer");
+        assert_eq!(t.step, "Loading models 43/82 · pieces 412/1259 · conifer · fir tree 01 a");
         t.line("MAPSMITH device OPTIX GPU");
         assert_eq!(t.device, "OPTIX GPU");
         t.line("MAPSMITH stage render");
         assert_eq!(t.pct, 40);
         t.line("MAPSMITH stats Remaining: 00:00.30 | Mem: 3M | Sample 4/8");
-        assert_eq!(t.pct, 64);
+        assert_eq!(t.pct, 63);
         t.line("MAPSMITH stats Mem: 1M | Loading render kernels (may take a few minutes the first time)");
         assert_eq!(t.step, "Rendering: Loading render kernels (may take a few minutes the first time)");
         t.line("MAPSMITH stage alpha");
         t.line("Fra:1 Mem:1.2G | Scene, ViewLayer | Sample 16/16");
-        assert_eq!(t.pct, 97);
+        assert_eq!(t.pct, 96);
+        // two pictures from one session: the first gets the first half of the bar
+        let mut t2 = Tracker { id_pass: false, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None, job: (1, 1) };
+        t2.line("MAPSMITH job 1/2");
+        t2.line("MAPSMITH stage render");
+        t2.line("MAPSMITH stats Sample 8/8");
+        assert_eq!(t2.pct, 69);
         assert_eq!(sample_of("x | Sample 12/128"), Some((12, 128)));
     }
 
