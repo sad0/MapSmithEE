@@ -682,6 +682,31 @@ fn walls(
             }
         })
         .collect();
+    // renders made before the id pass lost its dither carry +-1 noise on some pixels (a piece's number read as its
+    // neighbour's): each pixel takes the label most of its 3x3 block has (the centre wins ties)
+    let label: Vec<u32> = (0..w * h)
+        .into_par_iter()
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            let mut seen: [(u32, u8); 9] = [(0, 0); 9];
+            let mut k = 0;
+            for yy in y.saturating_sub(1)..(y + 2).min(h) {
+                for xx in x.saturating_sub(1)..(x + 2).min(w) {
+                    let l = label[yy * w + xx];
+                    match seen[..k].iter_mut().find(|s| s.0 == l) {
+                        Some(s) => s.1 += 1,
+                        None => {
+                            seen[k] = (l, 1);
+                            k += 1;
+                        }
+                    }
+                }
+            }
+            let c = label[i];
+            let cn = seen[..k].iter().find(|s| s.0 == c).map_or(0, |s| s.1);
+            seen[..k].iter().filter(|s| s.1 > cn).max_by_key(|s| s.1).map_or(c, |s| s.0)
+        })
+        .collect();
     let mut boxes = vec![(0usize, usize::MAX, usize::MAX, 0usize, 0usize); n + 1];
     for y in 0..h {
         for x in 0..w {
