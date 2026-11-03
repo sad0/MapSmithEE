@@ -751,29 +751,18 @@ fn walls(
     Ok((out, autos))
 }
 
-/// The engine tells "behind the wall" from the line between a wall's leftmost and its rightmost vertex: a character
-/// above that line (further away) is hidden. A traced outline has those two points anywhere (a tent's left foot and
-/// right roof edge: the line slanted, and a character behind the tent's right half stood "in front"). Two thin spikes,
-/// 2 px out on each side at row `yb` (the piece's lowest point), make that line the piece's ground line; they add no area.
-fn baseline(mut v: Vec<Pt>, yb: i32) -> Vec<Pt> {
-    let (x0, x1) = (v.iter().map(|p| p.0).min().unwrap_or(0), v.iter().map(|p| p.0).max().unwrap_or(0));
-    let (y0, y1) = (v.iter().map(|p| p.1).min().unwrap_or(0), v.iter().map(|p| p.1).max().unwrap_or(0));
-    let yb = yb.clamp(y0, y1);
-    let mid = (x0 + x1) / 2;
-    // the vertex on each side nearest to the ground row (left: the leftmost of the ties)
-    let pick = |left: bool| -> usize {
-        (0..v.len())
-            .filter(|&i| if left { v[i].0 <= mid } else { v[i].0 >= mid })
-            .min_by_key(|&i| ((v[i].1 - yb).abs(), if left { v[i].0 } else { -v[i].0 }))
-            .unwrap_or(0)
-    };
-    let (il, ir) = (pick(true), pick(false));
-    // insert the later index first so the earlier one stays valid
-    for (i, x) in if il > ir { [(il, x0 - 2), (ir, x1 + 2)] } else { [(ir, x1 + 2), (il, x0 - 2)] } {
-        let p = v[i];
-        v.splice(i + 1..i + 1, [(x, yb), p]);
-    }
-    v
+/// The engine's "behind the wall" line is a wall's first two vertices (flag 1), extended: BioWare's WEDs start every
+/// object outline with its two ground points. A character whose feet are above that line is behind. A traced outline
+/// starts anywhere, so the line went any way (half of the trees hid nobody). Here every wall starts with a 2 px
+/// horizontal step at row `yb` (the piece's lowest point), on a thin spike out of its right side: no added area.
+fn baseline(v: Vec<Pt>, yb: i32) -> Vec<Pt> {
+    let x1 = v.iter().map(|p| p.0).max().unwrap_or(0);
+    // the right side's vertex nearest to the ground row: the spike leaves from there
+    let ir = (0..v.len()).min_by_key(|&i| ((v[i].1 - yb).abs() - (v[i].0 - x1) * 2, -v[i].0)).unwrap_or(0);
+    let mut out = vec![(x1 + 1, yb), (x1 + 3, yb)];
+    out.extend_from_slice(&v[ir..]);
+    out.extend_from_slice(&v[..=ir]);
+    out
 }
 
 #[cfg(test)]
@@ -789,13 +778,13 @@ mod tests {
     }
 
     #[test]
-    fn baseline_spikes() {
+    fn baseline_first_edge() {
         // a tent-like outline: its left foot low, its right side high
         let v = vec![(0, 100), (0, 20), (50, 0), (100, 20), (100, 60)];
-        let b = baseline(v, 80);
-        let left = b.iter().min_by_key(|p| p.0).unwrap();
-        let right = b.iter().max_by_key(|p| p.0).unwrap();
-        assert_eq!((*left, *right), ((-2, 80), (102, 80)));
-        assert_eq!(b.len(), 9);
+        let b = baseline(v.clone(), 100);
+        // the first edge is the ground line, then the outline from the right side round to it again
+        assert_eq!(&b[..2], &[(101, 100), (103, 100)]);
+        assert_eq!(b.len(), v.len() + 3);
+        assert!(v.iter().all(|p| b.contains(p)));
     }
 }
