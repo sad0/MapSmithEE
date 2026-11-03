@@ -28,6 +28,7 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 - **Tree brush** to plant whole forests, **box selection** to move, turn, scale or recolour many pieces at once.
 - **Game data:** arrival point, exits to the world map, walkable / blocked cells (automatic from the objects, then
   painted by hand), camp-fire animations.
+- **Walls** that hide characters behind tents and trees, traced at the render, editable by hand, rebuilt in a second.
 - **Day and night** lighting, in the editor and in the render.
 - **Render area…** renders the map in Blender (day and night) and builds the playable area in one click.
 - Undo / redo for everything, automatic saving.

@@ -12,11 +12,12 @@ From the first look at the example camp to walking in your own area in the game.
 8. [Plant trees](#8-plant-trees)
 9. [Arrival point and exits](#9-arrival-point-and-exits)
 10. [Walkable cells](#10-walkable-cells)
-11. [Day and night](#11-day-and-night)
-12. [Render the area](#12-render-the-area)
-13. [Play it in the game](#13-play-it-in-the-game)
-14. [Shortcuts](#14-shortcuts)
-15. [Troubleshooting](#15-troubleshooting)
+11. [Walls](#11-walls)
+12. [Day and night](#12-day-and-night)
+13. [Render the area](#13-render-the-area)
+14. [Play it in the game](#14-play-it-in-the-game)
+15. [Shortcuts](#15-shortcuts)
+16. [Troubleshooting](#16-troubleshooting)
 
 ## 1. Install
 
@@ -142,14 +143,34 @@ Trees are ordinary pieces: select them, move them, delete them like any other.
 - **Block** and **Free** paint corrections; **Back to automatic** erases them.
 - Keep the arrival point and the exits on walkable ground.
 
-## 11. Day and night
+## 11. Walls
+
+![The Walls tool](img/walls.jpg)
+
+In the game, a **wall** hides the characters standing behind a piece: a tent, a tree, a wagon. MapSmithEE traces one
+around each piece when it renders the area. The rule is simple: a character whose feet are **lower** on the screen than
+the bottom of the piece walks **in front** of it; higher up, **behind** it.
+
+**Walls** (top bar, BG camera) shows them over the map: **cyan** = traced at the last render, **yellow** = your own,
+**red** = turned off.
+
+- Click a wall to select it. Drag its points; double-click its edge to add a point; right-click a point to remove it.
+  The piece's wall then becomes yours and follows the piece when you move it.
+- **Turn off / delete** (or **Del**): the piece hides nobody (or your drawn wall goes away).
+- **Back to traced**: forget your edit.
+- **Draw a wall**: click points on the map, then click the first one or press **Enter**. For something the render cannot
+  know, such as a rock face painted on the ground.
+- **Rebuild area (no render)** rebuilds the area in a second with your walls, spots, exits and walkable cells, from the
+  last render's pictures. Moved or added pieces need a new render.
+
+## 12. Day and night
 
 ![Night](img/night.jpg)
 
 **Day** and **Night** in the top bar switch the light. Fires, braziers, lanterns and torches light their surroundings at
 night. The render makes both versions (the game switches between them by itself).
 
-## 12. Render the area
+## 13. Render the area
 
 ![Render dialog](img/render-dialog.jpg)
 
@@ -182,7 +203,7 @@ The result is in `Documents\MapSmithEE\AR9900`:
 
 ![The Camp, rendered](img/render-day.jpg)
 
-## 13. Play it in the game
+## 14. Play it in the game
 
 When the render ends, the dialog shows a console line for your area, and the area folder holds the same steps in
 `HOW_TO_TEST.txt`.
@@ -205,7 +226,7 @@ When the render ends, the dialog shows a console line for your area, and the are
 The new area is not on the world map. To make it part of a mod, link to it with your mod's tools (a world map entry, or
 a script or dialogue that uses `LeaveAreaLUA`).
 
-## 14. Shortcuts
+## 15. Shortcuts
 
 | Key | Action |
 | --- | --- |
@@ -220,7 +241,7 @@ a script or dialogue that uses `LeaveAreaLUA`).
 | Ctrl+Z / Ctrl+Y | Undo / Redo |
 | Esc | Deselect, stop placing, cancel the pipette |
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 - **"Blender 5.x is needed"**: install Blender 5.x from blender.org, then reopen the Render dialog.
 - **The model download stopped**: click **Download models** again; it resumes where it stopped.
