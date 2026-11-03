@@ -35,7 +35,7 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 - **Walls** that hide characters behind tents and trees, traced at the render, editable by hand, rebuilt in a second.
 - **Day and night** lighting, in the editor and in the render.
 - **Render area…** renders the map in Blender (day and night) and builds the playable area in one click, optionally
-  with **HD tiles** (2x or 4x) for [IEX](https://github.com/sad0/IEX), which draws them when zoomed in.
+  with **HD tiles** (2x or 4x) for [IEX](https://github.com/sad0/IEX-releases), which draws them when zoomed in.
 - **Your own pieces:** import 3D models in any format Blender reads, 2D sprites (transparent PNG or BAM frames) and
   seamless ground textures.
 - **Export scene…** saves the scene for Blender (.blend, ready to render) or other 3D programs (.glb, .fbx).
