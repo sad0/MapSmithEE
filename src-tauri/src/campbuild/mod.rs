@@ -650,7 +650,7 @@ fn search_map(
 
 /// wall polygons: per piece taller than MIN_HEIGHT, its pixels in the id pass where the coverage pass is solid,
 /// closed 5x5 (leaf gaps: one shape), outer contours, Douglas-Peucker 2 px, area >= 80, then anchored on the piece's
-/// ground line (`baseline`). `xpm` / `ypm`: area pixels per metre across / in depth. A piece's wall edit replaces
+/// lowest row (`baseline`). `xpm` / `ypm`: area pixels per metre across / in depth. A piece's wall edit replaces
 /// its traced walls. Returns the walls and, for the editor, each piece's traced ones
 fn walls(
     its: &[Item],
@@ -736,7 +736,10 @@ fn walls(
             });
             let used = if off { Vec::new() } else { own.unwrap_or_else(|| traced.clone()) };
             let auto = (!traced.is_empty()).then(|| AutoWall { i: k, id: it.id.map(String::from), g, pts: traced });
-            (used.into_iter().map(|v| baseline(v, g.1)).collect(), auto)
+            // the ground line at the piece's lowest point on screen: a character whose feet are lower is in front, the
+            // others behind
+            let yb = used.iter().flatten().map(|p| p.1).max().unwrap_or(g.1);
+            (used.into_iter().map(|v| baseline(v, yb)).collect(), auto)
         })
         .collect();
     let mut out = Vec::new();
@@ -751,7 +754,7 @@ fn walls(
 /// The engine tells "behind the wall" from the line between a wall's leftmost and its rightmost vertex: a character
 /// above that line (further away) is hidden. A traced outline has those two points anywhere (a tent's left foot and
 /// right roof edge: the line slanted, and a character behind the tent's right half stood "in front"). Two thin spikes,
-/// 2 px out on each side at the piece's ground row `yb`, make that line the piece's own ground line; they add no area.
+/// 2 px out on each side at row `yb` (the piece's lowest point), make that line the piece's ground line; they add no area.
 fn baseline(mut v: Vec<Pt>, yb: i32) -> Vec<Pt> {
     let (x0, x1) = (v.iter().map(|p| p.0).min().unwrap_or(0), v.iter().map(|p| p.0).max().unwrap_or(0));
     let (y0, y1) = (v.iter().map(|p| p.1).min().unwrap_or(0), v.iter().map(|p| p.1).max().unwrap_or(0));
