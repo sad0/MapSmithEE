@@ -59,6 +59,12 @@
 
   async function check() {
     try {
+      const t = await invoke('camp3d_render_targets');
+      const opt = $('rdTarget').querySelector('option[value=sadoqol]');
+      opt.hidden = opt.disabled = !t.includes('sadoqol');
+      if (opt.disabled && $('rdTarget').value === 'sadoqol') $('rdTarget').value = 'generic';
+    } catch {}
+    try {
       const s = await invoke('library_status');
       libOk = s.ready;
       $('rdLib').textContent = s.ready ? `Model library: ${s.dir}` : 'The full-quality models (about 2.6 GB) are not downloaded yet.';

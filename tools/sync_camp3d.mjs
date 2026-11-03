@@ -20,9 +20,8 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-const DEFAULT_SRC = 'C:/Users/jnthn/AppData/Local/Temp/claude/E--SteamLibrary-steamapps-common-Baldur-s-Gate-Enhanced-Edition/401f8bea-5fa0-4451-b213-90608a8466a0/scratchpad/map3d';
 const ARGS = process.argv.slice(2), FORCE = ARGS.includes('--force');
-const SRC = path.resolve(ARGS.find(a => !a.startsWith('--')) || DEFAULT_SRC);
+const SRC = path.resolve(ARGS.find(a => !a.startsWith('--')) || (console.error('usage: node tools/sync_camp3d.mjs <exported Camp Map 3D folder> [--force]'), process.exit(1)));
 const DST = path.join(ROOT, 'static', 'camp3d');
 const VENDOR_SRC = path.join(HERE, 'vendor');
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.147.0/';

@@ -1,0 +1,11 @@
+name: Suggestion
+description: An idea to make MapSmithEE better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like to do, and why?
+    validations:
+      required: true

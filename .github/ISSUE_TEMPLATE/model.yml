@@ -1,0 +1,38 @@
+name: New model or texture
+description: Share a model or a ground texture for the library
+labels: [model]
+body:
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      placeholder: https://sketchfab.com/3d-models/...
+    validations:
+      required: true
+  - type: input
+    id: author
+    attributes:
+      label: Author
+    validations:
+      required: true
+  - type: dropdown
+    id: licence
+    attributes:
+      label: Licence
+      options: [CC0, CC BY 4.0, CC BY 3.0, My own work (I release it as CC BY 4.0)]
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options: [Nature, Tents, Furniture, Supplies, Fire & light, Weapons & training, Rugs & ground, Wagons & animals, Buildings & decor, Remains, Ground texture]
+  - type: input
+    id: size
+    attributes:
+      label: Real size (if known)
+      placeholder: about 0.9 m tall
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes

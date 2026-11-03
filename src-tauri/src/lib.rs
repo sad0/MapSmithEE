@@ -42,7 +42,8 @@ pub struct Settings {
     pub blender_exe: String,
 }
 
-/// where the render library lives: the setting, else <app data>/library, else John's working copy when it exists
+/// where the render library lives: the setting, else <app data>/library (a dev build also falls back on the
+/// author's working copy when it exists)
 pub fn library_dir(app: &tauri::AppHandle) -> PathBuf {
     let s = load_settings(app);
     if !s.library_dir.is_empty() {
@@ -50,7 +51,7 @@ pub fn library_dir(app: &tauri::AppHandle) -> PathBuf {
     }
     let own = app.path().app_data_dir().unwrap_or_default().join("library");
     let dev = PathBuf::from("E:/AI/bg3d");
-    if !library::is_library(&own) && library::is_library(&dev) { dev } else { own }
+    if cfg!(debug_assertions) && !library::is_library(&own) && library::is_library(&dev) { dev } else { own }
 }
 
 /// the release manifest of the model library
@@ -108,7 +109,10 @@ fn load_settings(app: &tauri::AppHandle) -> Settings {
         s.project_dir = docs.join("MapSmithEE").to_string_lossy().into_owned();
     }
     if s.blocked.is_empty() {
-        s.blocked = vec!["E:/Enhanced Edition/Environnement de test".into(), "steamapps/common".into()];
+        s.blocked = vec!["steamapps/common".into()];
+        if cfg!(debug_assertions) {
+            s.blocked.insert(0, "E:/Enhanced Edition/Environnement de test".into());
+        }
     }
     s
 }
@@ -401,6 +405,16 @@ struct RenderAreaReq {
 /// SadoQoL's camp files the SQCAMP build starts from (read only)
 const SADOQOL_CAMP_TEMPLATE: &str = "E:/Enhanced Edition/Environnement de test/EET 2.7.3 (dev)/SadoQoL/camp";
 
+/// the "SadoQoL camp" render target needs the SadoQoL sources' camp folder (read only); it is offered only where it exists
+#[tauri::command]
+fn camp3d_render_targets() -> Vec<&'static str> {
+    let mut t = vec!["generic"];
+    if Path::new(SADOQOL_CAMP_TEMPLATE).join("SQCAMP.ARE").is_file() {
+        t.push("sadoqol");
+    }
+    t
+}
+
 #[derive(Serialize)]
 struct RenderAreaReport {
     out_dir: String,
@@ -538,6 +552,7 @@ pub fn run() {
             library_status,
             library_install,
             library_cancel,
+            camp3d_render_targets,
             camp3d::camp3d_get,
             camp3d::camp3d_set,
             camp3d::camp3d_update,
