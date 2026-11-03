@@ -283,6 +283,11 @@ struct Tracker {
     pct: u32,
     step: String,
     device: String,
+    /// while loading: models done / total and the one being read, pieces placed / total, when that model started
+    models: (u32, u32),
+    model: String,
+    pieces: (u32, u32),
+    since: Option<Instant>,
 }
 
 /// "Sample 12/128" (Cycles' status line) -> (12, 128)
@@ -326,7 +331,18 @@ impl Tracker {
                 (Some("models"), Some(f)) => {
                     if let Some((i, n)) = f.split_once('/').and_then(|(i, n)| Some((i.parse::<u32>().ok()?, n.parse::<u32>().ok()?))) {
                         self.pct = 5 + 35 * i / n.max(1);
-                        self.step = format!("Loading models ({}/{n}: {})", i + 1, w.next().unwrap_or(""));
+                        let id = w.next().unwrap_or("");
+                        let label = w.collect::<Vec<_>>().join(" ");
+                        self.models = (i + 1, n);
+                        self.model = if label.is_empty() { id.to_string() } else { label };
+                        self.since = Some(Instant::now());
+                        self.step = self.load_step();
+                    }
+                }
+                (Some("item"), Some(f)) => {
+                    if let Some((i, n)) = f.split_once('/').and_then(|(i, n)| Some((i.parse::<u32>().ok()?, n.parse::<u32>().ok()?))) {
+                        self.pieces = (i, n);
+                        self.step = self.load_step();
                     }
                 }
                 (Some("stage"), Some(s)) => {
@@ -351,6 +367,32 @@ impl Tracker {
             self.step = "Lights and camera".into();
         }
         self.pct != pct || self.step != step
+    }
+
+    /// "Loading models 23/82 · pieces 412/1259 · fir tree (35 s)": the seconds keep counting while a big model imports
+    fn load_step(&self) -> String {
+        let mut s = format!("Loading models {}/{}", self.models.0, self.models.1);
+        if self.pieces.1 > 0 {
+            s += &format!(" · pieces {}/{}", self.pieces.0, self.pieces.1);
+        }
+        if !self.model.is_empty() {
+            s += &format!(" · {}", self.model);
+        }
+        if let Some(t) = self.since.filter(|t| t.elapsed() >= Duration::from_secs(2)) {
+            s += &format!(" ({} s)", t.elapsed().as_secs());
+        }
+        s
+    }
+
+    /// once a second while a model loads: refresh the seconds; true when the text changed
+    fn tick(&mut self) -> bool {
+        if self.stage != "load" || self.since.is_none() {
+            return false;
+        }
+        let s = self.load_step();
+        let changed = s != self.step;
+        self.step = s;
+        changed
     }
 
     fn stage_name(&self) -> &'static str {
@@ -437,7 +479,7 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
     }
     drop(tx);
 
-    let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new() };
+    let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None };
     let mut tail: Vec<String> = Vec::new();
     let mut traceback = false;
     let status = loop {
@@ -459,7 +501,11 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
                     progress(tr.pct, &tr.step);
                 }
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if tr.tick() {
+                    progress(tr.pct, &tr.step);
+                }
+            }
             Err(mpsc::RecvTimeoutError::Disconnected) => break child.wait().map_err(|e| e.to_string())?,
         }
     };
@@ -549,10 +595,13 @@ mod tests {
 
     #[test]
     fn samples_and_stages() {
-        let mut t = Tracker { id_pass: true, stage: "load", pct: 3, step: String::new(), device: String::new() };
+        let mut t = Tracker { id_pass: true, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None };
         assert!(t.line("MAPSMITH models 41/82 tent_pup"));
         assert_eq!(t.pct, 22);
-        assert_eq!(t.step, "Loading models (42/82: tent_pup)");
+        assert_eq!(t.step, "Loading models 42/82 · tent_pup");
+        assert!(t.line("MAPSMITH models 42/82 ph_fir_tree_01_a conifer"));
+        assert!(t.line("MAPSMITH item 412/1259"));
+        assert_eq!(t.step, "Loading models 43/82 · pieces 412/1259 · conifer");
         t.line("MAPSMITH device OPTIX GPU");
         assert_eq!(t.device, "OPTIX GPU");
         t.line("MAPSMITH stage render");

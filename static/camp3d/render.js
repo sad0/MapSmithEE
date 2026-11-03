@@ -23,6 +23,7 @@
   #rdBar > div{height:100%;width:0;background:var(--accent);transition:width .3s}
   #rdStep{font-size:12px;color:var(--mute);min-height:16px}
   #rdBtns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  #rdBox button:disabled{opacity:.4;cursor:default}
   `;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
