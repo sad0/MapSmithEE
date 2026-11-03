@@ -400,6 +400,9 @@ struct RenderAreaReq {
     /// "generic" (a self-contained area named `name`) or "sadoqol" (SadoQoL's camp SQCAMP, from its template)
     #[serde(default)]
     target: String,
+    /// 1 (the game's resolution), 2 or 4: HD tiles for IEX next to the 1x area
+    #[serde(default)]
+    scale: u32,
 }
 
 /// SadoQoL's camp files the SQCAMP build starts from (read only)
@@ -420,6 +423,8 @@ struct RenderAreaReport {
     out_dir: String,
     files: Vec<String>,
     console: Option<String>,
+    /// HD tiles folder in out_dir (scale > 1)
+    hd_dir: Option<String>,
     walls: usize,
     seconds: u64,
 }
@@ -466,6 +471,10 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
     let scripts = camprender::scripts_dir(&app);
     let cache = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join("model-cache");
     let (night, samples, map_id) = (req.night, req.samples.clamp(4, 1024), req.map_id.clone());
+    let scale = match req.scale {
+        2 | 4 => req.scale,
+        _ => 1,
+    };
     let started = std::time::Instant::now();
     camprender::CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
     tauri::async_runtime::spawn_blocking(move || -> Res<RenderAreaReport> {
@@ -491,12 +500,13 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
             also: if night { vec![camprender::AlsoRender { out_png: work.join("night.png"), hour: 22.0 }] } else { vec![] },
             cache_dir: Some(cache.clone()),
             scripts_dir: Some(scripts.clone()),
+            scale,
         };
         camprender::render(&r, &|p, step| emit(p * render_end / 100, format!("Render: {step}")), &camprender::CANCEL)?;
-        let last = LastRender { name, target: req.target.clone(), night };
+        let last = LastRender { name, target: req.target.clone(), night, scale: scale as usize };
         let rep = build_area(&docs, &work, &lib, &map_id, &last, &out_dir, &|p, step| emit(render_end + p * (100 - render_end) / 100, step))?;
         emit(100, "Done".into());
-        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, walls: rep.walls, seconds: started.elapsed().as_secs() })
+        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, hd_dir: rep.hd_dir, walls: rep.walls, seconds: started.elapsed().as_secs() })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -508,6 +518,13 @@ struct LastRender {
     name: String,
     target: String,
     night: bool,
+    /// the pictures' scale (HD tiles); 1 for renders made before it existed
+    #[serde(default = "one")]
+    scale: usize,
+}
+
+fn one() -> usize {
+    1
 }
 
 /// the area from the render pictures in `work` (day.png + passes, night.png), and the walls file for the editor
@@ -534,7 +551,7 @@ fn build_area(
     } else {
         campbuild::Mode::Generic
     };
-    let opts = campbuild::BuildOptions { name: last.name.clone(), mode, out_dir: out_dir.to_path_buf() };
+    let opts = campbuild::BuildOptions { name: last.name.clone(), mode, out_dir: out_dir.to_path_buf(), scale: last.scale };
     let rep = campbuild::build(&input, &opts, &|p, step| progress(p, format!("Area: {step}")))?;
     let walls = serde_json::json!({ "last": last, "auto": rep.auto_walls, "made": rep.walls });
     std::fs::write(work.join("walls.json"), walls.to_string()).map_err(|e| e.to_string())?;
@@ -568,7 +585,7 @@ async fn camp3d_rebuild_area(app: tauri::AppHandle, map_id: String) -> Res<Rende
     let started = std::time::Instant::now();
     tauri::async_runtime::spawn_blocking(move || -> Res<RenderAreaReport> {
         let rep = build_area(&docs, &work, &lib, &map_id, &last, &out_dir, &|_, _| {})?;
-        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, walls: rep.walls, seconds: started.elapsed().as_secs() })
+        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, hd_dir: rep.hd_dir, walls: rep.walls, seconds: started.elapsed().as_secs() })
     })
     .await
     .map_err(|e| e.to_string())?

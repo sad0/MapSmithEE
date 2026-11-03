@@ -36,6 +36,8 @@ W, D = L['size_m']; ELEV = math.radians(L.get('elev', 38))
 # the game's scale (BG3D_PXM, 42 px/m: BG's characters); the image size follows from the map's size in metres
 PXM = float(os.environ.get('BG3D_PXM', L.get('px_per_m', 60)))
 MAPW, MAPH = round(W * PXM / 64) * 64, round(D * PXM * math.sin(ELEV) / 64) * 64
+# HD tiles (IEX): the pictures at SCALE x that size, same camera; the alpha and id passes stay 1x (walls are 1x)
+SCALE = int(os.environ.get('MAPSMITH_SCALE') or 1)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
@@ -287,6 +289,7 @@ if CROP:
 sc.render.image_settings.file_format = 'PNG'
 for k, job in enumerate(JOBS):
     OUT = job['out']; light(float(job['hour']) if job.get('hour') is not None else HOUR)
+    sc.render.resolution_percentage = 100 * SCALE
     print(f"MAPSMITH job {k + 1}/{len(JOBS)}", flush=True)
     sc.render.filepath = OUT
     print('MAPSMITH stage render', flush=True)
@@ -297,6 +300,7 @@ for k, job in enumerate(JOBS):
     for d_ in decals: d_.hide_render = True
     gnd.hide_render = True; sc.render.film_transparent = True; sc.cycles.samples = 16; sc.cycles.use_denoising = False
     sc.render.image_settings.color_mode = 'RGBA'
+    sc.render.resolution_percentage = 100
     print('MAPSMITH stage alpha', flush=True)
     sc.render.filepath = OUT[:-4] + '_alpha.png'; bpy.ops.render.render(write_still=True)
     gnd.hide_render = False; sc.render.film_transparent = False

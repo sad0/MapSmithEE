@@ -66,6 +66,13 @@ pub struct RenderRequest {
     /// folder holding render_map.py and its modules; the source tree's `resources/blender` when None
     #[serde(default)]
     pub scripts_dir: Option<PathBuf>,
+    /// the pictures (not the passes: `_alpha`, `_id` stay 1x) at this many times the game's resolution (HD tiles)
+    #[serde(default = "one")]
+    pub scale: u32,
+}
+
+fn one() -> u32 {
+    1
 }
 
 fn default_samples() -> u32 {
@@ -489,6 +496,7 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         })
         .env("MAPSMITH_CACHE", req.cache_dir.as_deref().map(path_str).unwrap_or_default())
         .env("BG3D_PXM", &prep.px_per_m)
+        .env("MAPSMITH_SCALE", req.scale.max(1).to_string())
         .env("BG3D_TEXFILES", json!(prep.texfiles).to_string())
         .current_dir(&work)
         .stdin(Stdio::null())

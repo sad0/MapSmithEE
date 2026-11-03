@@ -172,37 +172,66 @@ pub fn pvr(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
 
 /// RGB picture of (tw*64) x (th*64) -> (TIS bytes, [(PVRZ name, bytes)])
 pub fn build(rgb: &[u8], tw: usize, th: usize, tis_name: &str) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
-    let (iw, ih) = (tw * 64, th * 64);
+    build_scaled(rgb, tw, th, tis_name, 1)
+}
+
+/// the same at `scale` x (IEX HD tiles, see IEX docs/HD_TILES.md): the picture is (tw*64*scale) x (th*64*scale), the
+/// tiles 64*scale texels (TIS header +0x14), the pages (1024*scale)^2 with the same names, the entries' x, y in
+/// texels of the HD page; the tile grid (tw x th) stays the 1x one
+pub fn build_scaled(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
+    let (ts, ps) = (64 * scale, PAGE * scale);
+    let (iw, ih) = (tw * ts, th * ts);
     let (pw, ph) = (tw.div_ceil(TPP), th.div_ceil(TPP));
     let pages: Vec<(String, Vec<u8>)> = (0..pw * ph)
         .into_par_iter()
         .map(|i| {
             let (px, py) = (i % pw, i / pw);
-            let mut page = vec![0u8; PAGE * PAGE * 3];
-            for y in 0..PAGE.min(ih.saturating_sub(py * PAGE)) {
-                let sy = py * PAGE + y;
-                let x0 = px * PAGE;
-                let n = PAGE.min(iw - x0);
-                page[y * PAGE * 3..(y * PAGE + n) * 3]
-                    .copy_from_slice(&rgb[(sy * iw + x0) * 3..(sy * iw + x0 + n) * 3]);
+            let mut page = vec![0u8; ps * ps * 3];
+            for y in 0..ps.min(ih.saturating_sub(py * ps)) {
+                let sy = py * ps + y;
+                let x0 = px * ps;
+                let n = ps.min(iw - x0);
+                page[y * ps * 3..(y * ps + n) * 3].copy_from_slice(&rgb[(sy * iw + x0) * 3..(sy * iw + x0 + n) * 3]);
             }
-            (page_name(tis_name, i), pvr(&page, PAGE, PAGE))
+            (page_name(tis_name, i), pvr(&page, ps, ps))
         })
         .collect();
     let mut tis = Vec::with_capacity(24 + tw * th * 12);
     tis.extend_from_slice(b"TIS V1  ");
-    for v in [(tw * th) as u32, 0x0c, 0x18, 64] {
+    for v in [(tw * th) as u32, 0x0c, 0x18, ts as u32] {
         tis.extend_from_slice(&v.to_le_bytes());
     }
     for ty in 0..th {
         for tx in 0..tw {
             let page = ((ty / TPP) * pw + tx / TPP) as i32;
-            for v in [page, ((tx % TPP) * 64) as i32, ((ty % TPP) * 64) as i32] {
+            for v in [page, ((tx % TPP) * ts) as i32, ((ty % TPP) * ts) as i32] {
                 tis.extend_from_slice(&v.to_le_bytes());
             }
         }
     }
     (tis, pages)
+}
+
+/// box filter: (w*s) x (h*s) RGB -> w x h
+pub fn downscale(rgb: &[u8], w: usize, h: usize, s: usize) -> Vec<u8> {
+    if s == 1 {
+        return rgb.to_vec();
+    }
+    let (sw, n) = (w * s, (s * s) as u32);
+    let mut out = vec![0u8; w * h * 3];
+    out.par_chunks_mut(w * 3).enumerate().for_each(|(y, row)| {
+        for x in 0..w {
+            for c in 0..3 {
+                let mut sum = 0u32;
+                for dy in 0..s {
+                    let i = ((y * s + dy) * sw + x * s) * 3 + c;
+                    sum += (0..s).map(|dx| rgb[i + dx * 3] as u32).sum::<u32>();
+                }
+                row[x * 3 + c] = ((sum + n / 2) / n) as u8;
+            }
+        }
+    });
+    out
 }
 
 #[cfg(test)]
@@ -221,6 +250,22 @@ mod tests {
             .sum::<f64>()
             / (w * h * 3) as f64;
         assert!(10.0 * (255.0f64 * 255.0 / err.max(1e-9)).log10() > 35.0);
+    }
+
+    #[test]
+    fn hd_entries_in_page_texels() {
+        let (tw, th, s) = (17, 2, 2);
+        let rgb = vec![90u8; tw * 64 * s * th * 64 * s * 3];
+        let (tis, pages) = build_scaled(&rgb, tw, th, "AR9900", s);
+        assert_eq!(u32::from_le_bytes(tis[20..24].try_into().unwrap()), 128);
+        assert_eq!(pages.len(), 2);
+        let e = |i: usize, k: usize| i32::from_le_bytes(tis[24 + i * 12 + k * 4..28 + i * 12 + k * 4].try_into().unwrap());
+        assert_eq!((e(15, 0), e(15, 1), e(15, 2)), (0, 15 * 128, 0));
+        assert_eq!((e(16, 0), e(16, 1)), (1, 0));
+        assert_eq!((e(tw + 1, 1), e(tw + 1, 2)), (128, 128));
+        let back = crate::tis::pvrz(&pages[0].1).unwrap();
+        assert_eq!((back.w, back.h), (2048, 2048));
+        assert_eq!(downscale(&[10, 20, 30, 12, 20, 30, 10, 20, 30, 10, 20, 31], 1, 1, 2), vec![11, 20, 30]);
     }
 
     #[test]

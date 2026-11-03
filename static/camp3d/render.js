@@ -34,6 +34,7 @@
     <label id="rdNameRow">Area name <input type="text" id="rdName" maxlength="6" spellcheck="false" placeholder="AR9900"></label>
     <label class="chk"><input type="checkbox" id="rdNight" checked> Night version too</label>
     <label>Quality <select id="rdQ"><option value="16">Draft (fast)</option><option value="64" selected>Good</option><option value="128">Final</option></select></label>
+    <label title="Also renders HD tiles (2x or 4x) for engines that draw them (IEX). The area itself stays at the game's resolution.">HD tiles <select id="rdScale"><option value="1" selected>None (1x)</option><option value="2">2x</option><option value="4">4x (slow)</option></select></label>
     <div class="note" id="rdLib">Checking the model library…</div>
     <div class="note" id="rdBl">Looking for Blender…</div>
     <div id="rdBar"><div></div></div><div id="rdStep"></div>
@@ -112,11 +113,12 @@
     const un = await listen('render-progress', ev => setBar(ev.payload.pct, ev.payload.step));
     try {
       await save(); await saveGround();
-      const r = await invoke('camp3d_render_area', { req: { map_id: mapId, name, night: $('rdNight').checked, samples: +$('rdQ').value, target } });
+      const r = await invoke('camp3d_render_area', { req: { map_id: mapId, name, night: $('rdNight').checked, samples: +$('rdQ').value, target, scale: +$('rdScale').value } });
       lastOut = r.out_dir;
       setBar(100, `Done: ${r.files.length} files in ${r.out_dir}`);
       // a new area: the console line that takes the party there (also in HOW_TO_TEST.txt)
       if (r.console) $('rdStep').innerHTML = `Done: ${r.files.length} files in ${r.out_dir}<br>To test it, copy them into the game's override folder, select the party in the game and type in its console (Ctrl+Space):<br><code style="user-select:all;color:var(--fg)">${r.console.replace(/</g, '&lt;')}</code>`;
+      if (r.hd_dir) $('rdStep').insertAdjacentHTML('beforeend', `<br>HD tiles (IEX): ${r.hd_dir}/, same names, put them in override instead of the 1x TIS and PVRZ.`);
       $('rdGo').textContent = 'Render again';
     } catch (e) {
       $('rdStep').textContent = String(e).includes('cancelled') ? 'Stopped.' : 'Render failed: ' + e;

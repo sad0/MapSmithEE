@@ -89,6 +89,14 @@ pub struct BuildOptions {
     pub name: String,
     pub mode: Mode,
     pub out_dir: PathBuf,
+    /// the render pictures (day, night) are at this scale (1, 2, 4): the area stays 1x (tiles made from the
+    /// pictures shrunk), and HD tiles for IEX go to `<out_dir>/HD<scale>X` (TIS + PVRZ, same names)
+    #[serde(default = "one")]
+    pub scale: usize,
+}
+
+fn one() -> usize {
+    1
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -100,6 +108,8 @@ pub struct BuildReport {
     pub walls: usize,
     pub blocked_cells: usize,
     pub flames: usize,
+    /// HD tiles folder (scale > 1), relative to out_dir
+    pub hd_dir: Option<String>,
     /// set when the ENTRY spot stood in an exit and was moved out
     pub entry_moved: Option<[i32; 2]>,
     /// a generic area: the game console line that takes the party to its arrival point (also in HOW_TO_TEST.txt)
@@ -381,7 +391,25 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     };
 
     progress(5, "Reading the render");
-    let rgb = load_rgb(&input.render, mw, mh)?;
+    let sc = opts.scale.max(1);
+    let hd_dir = format!("HD{sc}X");
+    let write_hd = |n: String, b: &[u8]| -> Result<(), String> {
+        let d = opts.out_dir.join(&hd_dir);
+        std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
+        std::fs::write(d.join(&n), b).map_err(|e| format!("{}/{n}: {e}", d.display()))
+    };
+    let hd = load_rgb(&input.render, mw * sc, mh * sc)?;
+    if sc > 1 {
+        progress(7, "HD tiles (PVRZ)");
+        let (t, p) = pvrz::build_scaled(&hd, tw, th, &name, sc);
+        write_hd(format!("{name}.TIS"), &t)?;
+        for (n, b) in &p {
+            write_hd(format!("{n}.PVRZ"), b)?;
+        }
+        report.hd_dir = Some(hd_dir.clone());
+    }
+    let rgb = pvrz::downscale(&hd, mw, mh, sc);
+    drop(hd);
     progress(10, "Tiles (PVRZ)");
     let (tis, pages) = pvrz::build(&rgb, tw, th, &name);
     write(format!("{name}.TIS"), &tis)?;
@@ -413,8 +441,17 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
 
     if let Some(n) = &input.night {
         progress(50, "Night tiles (PVRZ)");
-        let nrgb = load_rgb(n, mw, mh)?;
+        let nhd = load_rgb(n, mw * sc, mh * sc)?;
         let nn = format!("{name}N");
+        if sc > 1 {
+            let (t, p) = pvrz::build_scaled(&nhd, tw, th, &nn, sc);
+            write_hd(format!("{nn}.TIS"), &t)?;
+            for (n, b) in &p {
+                write_hd(format!("{n}.PVRZ"), b)?;
+            }
+        }
+        let nrgb = pvrz::downscale(&nhd, mw, mh, sc);
+        drop(nhd);
         let (ntis, npages) = pvrz::build(&nrgb, tw, th, &nn);
         write(format!("{nn}.TIS"), &ntis)?;
         for (n, b) in &npages {
