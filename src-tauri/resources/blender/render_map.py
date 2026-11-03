@@ -29,6 +29,13 @@ MODELS = json.load(open(f'{LIB}/models.json'))
 PROXY_DIMS = {}
 for _f in os.listdir(f'{LIB}/proxies'):
     if _f.startswith('index') and _f.endswith('.json'): PROXY_DIMS.update({k: v['dims'] for k, v in json.load(open(f'{LIB}/proxies/{_f}')).items()})
+# the user's own pieces and ground textures (MapSmithEE "Import...": MAPSMITH_USERLIB), next to the library's
+USERLIB = os.environ.get('MAPSMITH_USERLIB', '').replace(chr(92), '/').rstrip('/')
+if USERLIB and os.path.exists(f'{USERLIB}/models.json'):
+    MODELS.update(json.load(open(f'{USERLIB}/models.json')))
+    if os.path.exists(f'{USERLIB}/proxies/index_user.json'):
+        PROXY_DIMS.update({k: v['dims'] for k, v in json.load(open(f'{USERLIB}/proxies/index_user.json')).items()})
+def texdir(name): return f'{USERLIB}/tex/{name}' if USERLIB and os.path.isdir(f'{USERLIB}/tex/{name}') else f'{TEX}/{name}'
 # per-model height corrections from the editor's Calibrate mode (db models/offsets, exported next to the layout)
 OFF_F = os.path.join(os.path.dirname(a[0]), 'models', 'offsets.json')
 OFFSETS = (lambda d: d.get('data', d).get('offsets', {}))(json.load(open(OFF_F))) if os.path.exists(OFF_F) else {}
@@ -79,9 +86,9 @@ for i, name in enumerate(G['layers']):
     name = name.split('~')[0]   # a variant ("dirt~2": its own colour) uses its base layer's texture
     tile = nt.nodes.new('ShaderNodeMapping'); tile.inputs['Scale'].default_value = (W / tm, D / tm, 1)
     nt.links.new(uv.outputs['UV'], tile.inputs[0])
-    t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(TEXFILES.get(str(i)) or f'{TEX}/{name}/diff_2k.jpg'); nt.links.new(tile.outputs[0], t.inputs[0])
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(TEXFILES.get(str(i)) or f'{texdir(name)}/diff_2k.jpg'); nt.links.new(tile.outputs[0], t.inputs[0])
     # relief: the layer's bump / displacement map, else flat
-    hp = next((f for f in (f'{TEX}/{name}/bump.jpg', f'{TEX}/{name}/disp_2k.jpg') if os.path.exists(f)), None)
+    hp = next((f for f in (f'{texdir(name)}/bump.jpg', f'{texdir(name)}/disp_2k.jpg') if os.path.exists(f)), None)
     if hp:
         hn = nt.nodes.new('ShaderNodeTexImage'); hn.image = bpy.data.images.load(hp); hn.image.colorspace_settings.name = 'Non-Color'
         nt.links.new(tile.outputs[0], hn.inputs[0]); h_out = hn.outputs[0]
@@ -287,6 +294,12 @@ if CROP:
     sc.render.border_min_x, sc.render.border_max_x = x0 / MAPW, x1 / MAPW
     sc.render.border_min_y, sc.render.border_max_y = 1 - y1 / MAPH, 1 - y0 / MAPH
 sc.render.image_settings.file_format = 'PNG'
+# "Export scene" (MAPSMITH_EXPORT, see exportscene.py): the scene lit for its hour, saved instead of rendered
+if os.environ.get('MAPSMITH_EXPORT'):
+    import exportscene
+    light(HOUR)
+    exportscene.save(json.loads(os.environ['MAPSMITH_EXPORT']), sc, gnd, lib, list(_bgmesh), PXM)
+    sys.exit(0)
 for k, job in enumerate(JOBS):
     OUT = job['out']; light(float(job['hour']) if job.get('hour') is not None else HOUR)
     sc.render.resolution_percentage = 100 * SCALE

@@ -9,6 +9,7 @@ pub mod camprender;
 pub mod render;
 pub mod res;
 pub mod tis;
+pub mod userlib;
 pub mod wed;
 
 use res::{Game, Res};
@@ -501,6 +502,8 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
             cache_dir: Some(cache.clone()),
             scripts_dir: Some(scripts.clone()),
             scale,
+            export: None,
+            user_lib: Some(userlib_dir(&app)?),
         };
         camprender::render(&r, &|p, step| emit(p * render_end / 100, format!("Render: {step}")), &camprender::CANCEL)?;
         let last = LastRender { name, target: req.target.clone(), night, scale: scale as usize };
@@ -544,7 +547,7 @@ fn build_area(
         alpha: Some(work.join("day_alpha.png")),
         id: Some(work.join("day_id.png")),
         night: last.night.then(|| work.join("night.png")),
-        models: campbuild::Models::Dir(lib.join("proxies")),
+        models: campbuild::Models::Dirs(vec![lib.join("proxies"), userlib_dir_of(docs).join("proxies")]),
     };
     let mode = if last.target == "sadoqol" {
         campbuild::Mode::SadoQolCamp { template_dir: PathBuf::from(SADOQOL_CAMP_TEMPLATE) }
@@ -596,10 +599,145 @@ fn camp3d_render_cancel() {
     camprender::CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+/// the user's own pieces and ground textures ("Import…"), next to the camp3d documents: <app data>/userlib
+fn userlib_dir_of(docs: &Path) -> PathBuf {
+    docs.parent().unwrap_or(docs).join("userlib")
+}
+
+fn userlib_dir(app: &tauri::AppHandle) -> Res<PathBuf> {
+    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("userlib"))
+}
+
+fn blender_of(app: &tauri::AppHandle) -> Res<PathBuf> {
+    let s = load_settings(app);
+    let b = if s.blender_exe.is_empty() { camprender::find_blender() } else { Some(PathBuf::from(&s.blender_exe)) };
+    b.filter(|p| p.is_file()).ok_or_else(|| "Blender not found: set its path in the settings".into())
+}
+
+/// the editor's start: the user's pieces (editor entries) and ground textures
+#[tauri::command]
+fn userlib_list(app: tauri::AppHandle) -> Res<serde_json::Value> {
+    Ok(userlib::list(&userlib_dir(&app)?))
+}
+
+#[derive(serde::Deserialize)]
+struct ImportReq {
+    /// "model" (any format Blender reads), "sprite" (PNG with an optional _shadow sibling, or BAM) or "texture"
+    kind: String,
+    path: String,
+    name: String,
+    /// the piece's type (models.json label: "bush", "barrel"...), which sets its tray category
+    #[serde(default)]
+    label: String,
+    /// a model's height in metres (else its own size)
+    #[serde(default)]
+    height_m: Option<f64>,
+    /// a BAM's cycle and frame
+    #[serde(default)]
+    cycle: usize,
+    #[serde(default)]
+    frame: usize,
+}
+
+#[tauri::command]
+async fn userlib_import(app: tauri::AppHandle, req: ImportReq) -> Res<serde_json::Value> {
+    let dir = userlib_dir(&app)?;
+    let src = PathBuf::from(&req.path);
+    if !src.is_file() {
+        return Err(format!("{} not found", src.display()));
+    }
+    let name = if req.name.trim().is_empty() { src.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default() } else { req.name.clone() };
+    let label = if req.label.trim().is_empty() { "statue".to_string() } else { req.label.trim().to_string() };
+    let (blender, scripts) = if req.kind == "model" { (Some(blender_of(&app)?), camprender::scripts_dir(&app)) } else { (None, PathBuf::new()) };
+    tauri::async_runtime::spawn_blocking(move || match req.kind.as_str() {
+        "texture" => userlib::import_texture(&dir, &src, &name),
+        "sprite" => userlib::import_sprite(&dir, &src, &name, &label, req.cycle, req.frame),
+        "model" => userlib::import_model(&dir, blender.as_deref().unwrap(), &scripts, &src, &name, &label, req.height_m),
+        k => Err(format!("unknown import kind {k}")),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn userlib_delete(app: tauri::AppHandle, id: String) -> Res<()> {
+    userlib::delete(&userlib_dir(&app)?, &id)
+}
+
+#[derive(serde::Deserialize)]
+struct ExportReq {
+    map_id: String,
+    /// "blend", "glb" or "fbx"
+    format: String,
+    path: String,
+    #[serde(default)]
+    night: bool,
+}
+
+/// "Export scene…": the scene Blender would render (camera, sun and fires of the hour, ground, pieces), saved for
+/// another 3D program; progress on "render-progress" like a render
+#[tauri::command]
+async fn camp3d_export_scene(app: tauri::AppHandle, req: ExportReq) -> Res<String> {
+    use tauri::Emitter;
+    if !["blend", "glb", "fbx"].contains(&req.format.as_str()) {
+        return Err(format!("unknown format {}", req.format));
+    }
+    let lib = library_dir(&app);
+    if !library::is_library(&lib) {
+        return Err("the model library is not downloaded yet".into());
+    }
+    let docs = camp3d::root(&app)?;
+    let read = |doc: &str| -> Res<serde_json::Value> {
+        let p = docs.join("maps").join(format!("{doc}.json"));
+        let t = std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+        serde_json::from_str(&t).map_err(|e| e.to_string())
+    };
+    let map_doc = read(&req.map_id)?;
+    let ground_doc = read(&format!("{}_ground", req.map_id))?;
+    let layers = ground_doc.get("layers").and_then(|l| l.as_array()).map(|l| l.len()).unwrap_or(0);
+    let ground_masks = (0..layers).map(|i| read(&format!("{}_g{i}", req.map_id)).unwrap_or(serde_json::Value::Null)).collect();
+    let offsets = std::fs::read_to_string(docs.join("models").join("offsets.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
+    let data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let work = data.join("render").join(&req.map_id).join("export");
+    let s = load_settings(&app);
+    let r = camprender::RenderRequest {
+        map_doc,
+        ground_doc,
+        ground_masks,
+        offsets,
+        out_png: work.join("unused.png"),
+        samples: 128,
+        hour: Some(if req.night { 22.0 } else { 14.0 }),
+        id_pass: false,
+        crop: None,
+        blender_exe: if s.blender_exe.is_empty() { None } else { Some(PathBuf::from(&s.blender_exe)) },
+        library_dir: lib,
+        work_dir: work.join("prep"),
+        also: vec![],
+        cache_dir: Some(data.join("render").join("model-cache")),
+        scripts_dir: Some(camprender::scripts_dir(&app)),
+        scale: 1,
+        export: Some(serde_json::json!({ "path": req.path.replace('\\', "/"), "format": req.format })),
+        user_lib: Some(data.join("userlib")),
+    };
+    camprender::CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+    let path = req.path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        camprender::render(&r, &|p, step| {
+            let _ = app.emit("render-progress", RenderAreaProgress { pct: p, step: format!("Export: {step}") });
+        }, &camprender::CANCEL)
+        .map(|_| path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = App::default();
     let pics = app.pics.clone();
+    // the user's own pieces and textures for the editor (http://msuser.localhost/<path> on Windows)
+    let user_dir2: std::sync::Mutex<Option<PathBuf>> = Default::default();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(app)
@@ -615,7 +753,27 @@ pub fn run() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
+        .register_uri_scheme_protocol("msuser", move |ctx, req| {
+            let mut d = user_dir2.lock().unwrap();
+            if d.is_none() {
+                *d = ctx.app_handle().path().app_data_dir().ok().map(|p| p.join("userlib"));
+            }
+            let path = req.uri().path().to_string();
+            match d.as_ref().and_then(|d| userlib::serve(d, &path)) {
+                Some((b, mime)) => tauri::http::Response::builder()
+                    .header("Content-Type", mime)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "no-store")
+                    .body(b)
+                    .unwrap(),
+                None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            userlib_list,
+            userlib_import,
+            userlib_delete,
+            camp3d_export_scene,
             settings_get,
             settings_set,
             game_open,

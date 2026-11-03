@@ -57,6 +57,8 @@ pub struct Model {
 #[serde(untagged)]
 pub enum Models {
     Dir(PathBuf),
+    /// several such folders (the library's proxies, then the user's own pieces), merged in that order
+    Dirs(Vec<PathBuf>),
     Table(HashMap<String, Model>),
 }
 
@@ -186,6 +188,18 @@ fn read_doc(p: &Path) -> Result<Value, String> {
 fn load_models(m: &Models) -> Result<HashMap<String, Model>, String> {
     match m {
         Models::Table(t) => Ok(t.clone()),
+        Models::Dirs(ds) => {
+            let mut out = HashMap::new();
+            for d in ds.iter().filter(|d| d.is_dir()) {
+                if let Ok(m) = load_models(&Models::Dir(d.clone())) {
+                    out.extend(m);
+                }
+            }
+            if out.is_empty() {
+                return Err("no models (index*.json)".into());
+            }
+            Ok(out)
+        }
         Models::Dir(d) => {
             let mut names: Vec<String> = std::fs::read_dir(d)
                 .map_err(|e| format!("{}: {e}", d.display()))?

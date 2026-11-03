@@ -65,6 +65,21 @@ The palette lists every model as a picture.
 
 Click a model, then click the ground to place it. Hold **Shift** to place several copies in a row. **Esc** stops.
 
+### Your own models and sprites
+
+**Import…** under the category buttons adds your own pieces to the tray (they show with a dashed frame):
+
+- **3D model**: any format Blender reads (glTF / GLB, OBJ, FBX, STL, DAE, USD, PLY, Alembic, X3D, .blend). Blender
+  converts it, stands it on the ground and makes a light copy for the editor (it takes up to a minute). Give its
+  **Height** in metres, or leave it empty to keep the model's own size (a model made in centimetres is detected).
+- **2D sprite**: a transparent PNG drawn at BG's angle and pixel size, or a frame of a BAM. It stands like BG's own
+  trees, facing the camera, at its size in game pixels. A `<name>_shadow.png` next to the PNG becomes its shadow on the
+  ground.
+
+**Type** sets its category in the tray (and makes a campfire, brazier or lantern light the night). Right-click one of
+your pieces in the tray to delete it. Your imports live in MapSmithEE's own folder
+(`%APPDATA%\com.sad0.mapsmithee\userlib`) and every map can use them.
+
 ## 5. Select and edit
 
 ![A tent selected](img/select-tent.jpg)
@@ -108,6 +123,11 @@ ones.
 - **Pipette (I)** (top of the panel): click the map to pick the ground painted there, variant included; the brush goes on
   with it.
 - **Ctrl+Z / Ctrl+Y** undo and redo strokes and colour changes too.
+
+### Your own textures
+
+**Import texture…** under the ground textures adds a picture as a new ground. It is tiled over the map, so use a
+seamless one (2048 px at most are kept). The editor reloads to add it to the list.
 
 ## 8. Plant trees
 
@@ -202,6 +222,17 @@ The result is in `Documents\MapSmithEE\AR9900`:
 | `HOW_TO_TEST.txt` | how to try the area in the game, with its console line |
 
 ![The Camp, rendered](img/render-day.jpg)
+
+### Export the scene
+
+**Export scene…** saves the scene Blender renders (the BG camera, the sun and fires of the hour, the painted ground,
+every piece) to open in another 3D program:
+
+- **Blender (.blend)**: everything, textures packed in, ready to render as MapSmithEE does.
+- **glTF (.glb)** and **FBX (.fbx)**: for other programs and engines. The painted ground is baked into one picture;
+  pieces keep their textures but not their own colour, and BG sprite shadows come out solid.
+
+A big map makes big files (the Camp: about 2 GB) and a glTF export can take a while.
 
 ## 14. Play it in the game
 

@@ -69,6 +69,13 @@ pub struct RenderRequest {
     /// the pictures (not the passes: `_alpha`, `_id` stay 1x) at this many times the game's resolution (HD tiles)
     #[serde(default = "one")]
     pub scale: u32,
+    /// save the scene instead of rendering it: `{"path": ..., "format": "blend" | "glb" | "fbx"}` (exportscene.py);
+    /// `out_png` is then not written
+    #[serde(default)]
+    pub export: Option<Value>,
+    /// the user's own models and textures (userlib), next to the library
+    #[serde(default)]
+    pub user_lib: Option<PathBuf>,
 }
 
 fn one() -> u32 {
@@ -284,7 +291,13 @@ fn prepare(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBoo
             return Err("cancelled".into());
         }
         // a variant ("dirt~2": the same texture, its own colour) reads its base layer's texture
-        let src = lib.join("tex").join(name.split('~').next().unwrap_or(name)).join("diff_2k.jpg");
+        let base = name.split('~').next().unwrap_or(name);
+        let src = req
+            .user_lib
+            .as_ref()
+            .map(|u| u.join("tex").join(base).join("diff_2k.jpg"))
+            .filter(|p| p.is_file())
+            .unwrap_or_else(|| lib.join("tex").join(base).join("diff_2k.jpg"));
         let out = groundadj::make(&src, name, a, &work.join("ground"))?;
         texfiles.insert(i.to_string(), path_str(&out));
     }
@@ -497,6 +510,8 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         .env("MAPSMITH_CACHE", req.cache_dir.as_deref().map(path_str).unwrap_or_default())
         .env("BG3D_PXM", &prep.px_per_m)
         .env("MAPSMITH_SCALE", req.scale.max(1).to_string())
+        .env("MAPSMITH_EXPORT", req.export.as_ref().map(|e| e.to_string()).unwrap_or_default())
+        .env("MAPSMITH_USERLIB", req.user_lib.as_deref().map(path_str).unwrap_or_default())
         .env("BG3D_TEXFILES", json!(prep.texfiles).to_string())
         .current_dir(&work)
         .stdin(Stdio::null())
@@ -560,7 +575,11 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
     for r in readers {
         let _ = r.join();
     }
-    if !status.success() || traceback || !out.is_file() {
+    let made = match req.export.as_ref().and_then(|e| e.get("path")).and_then(Value::as_str) {
+        Some(p) => PathBuf::from(p),
+        None => out.clone(),
+    };
+    if !status.success() || traceback || !made.is_file() {
         return Err(format!("Blender failed ({status}):\n{}", tail.join("\n")));
     }
     let stem = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();

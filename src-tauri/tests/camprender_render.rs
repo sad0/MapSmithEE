@@ -44,6 +44,8 @@ fn render_sample_map() {
         blender_exe: None,
         library_dir: PathBuf::from(var("MAPSMITH_LIBRARY")),
         work_dir: out.parent().unwrap().join("work"),
+        export: None,
+        user_lib: None,
         scale: std::env::var("MAPSMITH_SCALE").ok().and_then(|s| s.parse().ok()).unwrap_or(1),
         // MAPSMITH_ALSO_HOUR: a second picture (e.g. 22 for night) from the same session; MAPSMITH_CACHE_DIR: model cache
         also: std::env::var("MAPSMITH_ALSO_HOUR").ok().and_then(|h| h.parse().ok()).map(|hour| {

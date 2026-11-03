@@ -262,7 +262,10 @@ const GROUNDS = [
   { id: 'acifer_BG-Rocks_05', name: 'BG rocks', px: 512 }, { id: 'acifer_BG_Water01', name: 'BG water', px: 512 }];
 // a map's own variants of a layer ("dirt~2", named "Dirt path 2"): the same texture with its own colour and mask,
 // added after the built-in layers (in the order they were made), so they paint on top of them
-const BASE_N = GROUNDS.length;
+let BASE_N = GROUNDS.length;   // the user's own textures join the built-in layers at start (boot)
+// the user's own pieces and ground textures ("Import…", userlib.js), served by MapSmithEE from <app data>/userlib
+const UL = /Windows/.test(navigator.userAgent) ? 'http://msuser.localhost/' : 'msuser://localhost/';
+const texUrl = id => (GROUNDS.find(g => g.id === id) || {}).user ? `${UL}tex/${id}.jpg` : `tex/${id}.jpg`;
 const baseId = id => id.split('~')[0];
 const baseOf = i => i < BASE_N ? i : GROUNDS.findIndex(g => g.id === baseId(GROUNDS[i].id));
 // metres covered by one image of a layer
@@ -349,7 +352,7 @@ border.position.set(W / 2, 0.02, D / 2); scene.add(border);
 const masks = GROUNDS.map(() => { const c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1]; return c; });
 const patterns = [];
 let layer = 4, maskDirty = false, dirtyLayers = new Set(), layerUsed = GROUNDS.map((g, i) => i === 0);   // the dirt path first: grass is already everywhere
-function loadImg(src) { return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; }); }
+function loadImg(src) { return new Promise((ok, no) => { const i = new Image(); if (src.startsWith(UL)) i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = no; i.src = src; }); }
 // Seeded random, so the ground looks the same at every visit
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const BOMB_M = 10;                        // a texture is rebuilt into a 10 m tile of shuffled patches
@@ -416,13 +419,13 @@ function setMapSize(t, keep) {
   $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera 38°`;
 }
 async function loadGround() {
-  groundImgs = await Promise.all(GROUNDS.map(g => loadImg(`tex/${baseId(g.id)}.jpg`)));
+  groundImgs = await Promise.all(GROUNDS.map(g => loadImg(texUrl(baseId(g.id)))));
   buildPatterns();
   const base = masks[0].getContext('2d'); base.fillStyle = '#fff'; base.fillRect(0, 0, MASK[0], MASK[1]);   // grass everywhere at first
   compose(0, 0, GROUND_PX[0], GROUND_PX[1]);
   const sw = $('swatches');
   GROUNDS.forEach((g, i) => {
-    const b = document.createElement('button'); b.className = 'sw'; b.style.backgroundImage = `url(tex/${g.id}.jpg)`; b.textContent = g.name;
+    const b = document.createElement('button'); b.className = 'sw'; b.style.backgroundImage = `url(${texUrl(g.id)})`; b.textContent = g.name;
     b.onclick = () => { layer = i; showAdj(); }; sw.appendChild(b);
   });
   showAdj();
@@ -551,7 +554,7 @@ function showAdj() {
   GROUNDS.forEach((g, i) => {
     if (i !== b && !(i >= BASE_N && baseOf(i) === b)) return;
     const el = document.createElement('button'); el.className = 'sw' + (i === layer ? ' on' : ''); el.textContent = g.name;
-    el.style.backgroundImage = `url(tex/${baseId(g.id)}.jpg)`; el.style.filter = cssFilter(adj[i] || ADJ0);
+    el.style.backgroundImage = `url(${texUrl(baseId(g.id))})`; el.style.filter = cssFilter(adj[i] || ADJ0);
     el.onclick = () => { layer = i; showAdj(); }; vs.appendChild(el);
   });
   const nb = document.createElement('button'); nb.className = 'sw new'; nb.textContent = '+ New'; nb.title = 'A new variant of this ground with its own colour';
@@ -635,7 +638,10 @@ function getModel(id) {
   if (proto[id]) return Promise.resolve(proto[id]);
   // The models are glTF JSON with the binary inlined as base64 (artifacts serve no .glb). The loader would fetch()
   // that data: URI, which the page's security policy blocks, so rebuild the GLB container here and parse it.
-  if (!loading[id]) loading[id] = fetch(`models/${id}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(js => new Promise((ok, no) => {
+  // the user's own pieces are plain GLB files (userlib)
+  const got = r => { if (!r.ok) throw new Error(r.status); return M[id] && M[id].user ? r.arrayBuffer() : r.json(); };
+  if (!loading[id]) loading[id] = fetch(M[id] && M[id].user ? `${UL}editor/${id}.glb` : `models/${id}.json`).then(got).then(js => new Promise((ok, no) => {
+    if (js instanceof ArrayBuffer) return parse(js, ok, no);
     const uri = js.buffers && js.buffers[0] && js.buffers[0].uri;
     let bin = new Uint8Array(0);
     if (uri && uri.startsWith('data:')) {
@@ -649,7 +655,11 @@ function getModel(id) {
     dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.length, true);
     dv.setUint32(12, jl, true); dv.setUint32(16, 0x4E4F534A, true); out.fill(0x20, 20, 20 + jl); out.set(jb, 20);
     if (bin.length) { const o = 20 + jl; dv.setUint32(o, bl, true); dv.setUint32(o + 4, 0x004E4942, true); out.set(bin, o + 8); }
-    loader.parse(out.buffer, '', g => {
+    parse(out.buffer, ok, no);
+  })).catch(e => { delete loading[id]; toast(`Model ${id} failed to load`); throw e; });
+  return loading[id];
+  function parse(buf, ok, no) {
+    loader.parse(buf, '', g => {
       g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material) { o.material.side = THREE.DoubleSide; o.material.shadowSide = THREE.DoubleSide; if (o.material.map) o.material.alphaTest = o.material.transparent ? 0.4 : o.material.alphaTest; } } });
       // trees: "sprite" = the tree seen from BG's camera, "cards" = crossed side views (shadows, free view)
       g.scene.traverse(o => { if (o.isMesh && (o.name === 'bgtree' || o.name === 'bgshadow')) { o.castShadow = false; o.receiveShadow = false;
@@ -663,8 +673,7 @@ function getModel(id) {
       applyTreeView();
       proto[id] = g.scene; ok(g.scene);
     }, no);
-  })).catch(e => { delete loading[id]; toast(`Model ${id} failed to load`); throw e; });
-  return loading[id];
+  }
 }
 const objs = [];             // { it: saved item, node: Object3D }
 let idsAdded = false;         // pieces got their id (older maps): save them
@@ -1537,7 +1546,9 @@ function fillTray() {
     const b = document.createElement('button'); b.className = 'tile' + (placing === id ? ' pick' : '');
     b.title = `${m.name ? m.name + ' · ' : ''}${m.label} · ${m.dims.map(v => v.toFixed(1)).join(' × ')} m · ${id}`;
     // one atlas for every thumbnail (tools/thumb_atlas.py: 16 columns of 96 px cells, drawn here at 58 px)
-    b.innerHTML = `<i class="th" style="background-position:${-(m.ti % 16) * 58}px ${-Math.floor(m.ti / 16) * 58}px"></i><span>${m.name || m.label}</span>`;
+    b.innerHTML = m.user ? `<i class="th" style="background:url(${UL}thumbs/${id}.png) center/contain no-repeat"></i><span>${m.name || m.label}</span>`
+      : `<i class="th" style="background-position:${-(m.ti % 16) * 58}px ${-Math.floor(m.ti / 16) * 58}px"></i><span>${m.name || m.label}</span>`;
+    if (m.user) { b.classList.add('user'); b.oncontextmenu = e => { e.preventDefault(); if (window.userlibDelete) userlibDelete(id); }; b.title += ' · your import (right-click: delete)'; }
     b.onclick = () => { placing = id; setTool('sel'); select(null); [...tray.children].forEach(c => c.classList.toggle('pick', c === b)); getModel(id); toast('Click the ground to place it (Shift: keep placing)'); };
     tray.appendChild(b);
   }
@@ -1751,6 +1762,16 @@ function loop() {
 }
 async function boot() {
   M = await (await fetch('models.json')).json();
+  // the user's own pieces and ground textures (userlib.js imports them)
+  try {
+    const U = await window.__TAURI__.core.invoke('userlib_list');
+    for (const [id, m] of Object.entries(U.models || {})) M[id] = { ...m, user: 1 };
+    for (const t of U.textures || []) {
+      GROUNDS.push({ id: t.id, name: t.name, user: 1 });
+      const c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1]; masks.push(c); adj.push({ ...ADJ0 }); layerUsed.push(false);
+    }
+    BASE_N = GROUNDS.length;
+  } catch (e) { console.warn('userlib', e); }
   M.flame = { label: 'flame', name: 'Camp fire flame (game animation)', group: 'camp', dims: [1.9, 1.9, 1.6], notray: 1 };
   placeBG(); resize(); setTime(14); buildTray(); buildTreeKinds(); setTool('sel'); loop();
   await loadGround().catch(() => status('Ground textures missing', 'warn'));
@@ -1760,3 +1781,4 @@ async function boot() {
 boot();
 </script>
 <script src="render.js"></script>
+<script src="userlib.js"></script>
