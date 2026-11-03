@@ -102,6 +102,8 @@ pub struct BuildReport {
     pub flames: usize,
     /// set when the ENTRY spot stood in an exit and was moved out
     pub entry_moved: Option<[i32; 2]>,
+    /// a generic area: the game console line that takes the party to its arrival point (also in HOW_TO_TEST.txt)
+    pub console: Option<String>,
     pub ms: u64,
 }
 
@@ -465,7 +467,23 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
             write(format!("{name}.ARE"), &files::are_sadoqol(&tpl, &area)?)?;
             write("M_SQ0CMP.lua".into(), files::lua(&area).as_bytes())?;
         }
-        None => write(format!("{name}.ARE"), &files::are_generic(&area))?,
+        None => {
+            write(format!("{name}.ARE"), &files::are_generic(&area))?;
+            // tested in BGEE 2.7.3: MoveToArea takes the selected characters there (C:Eval with LeaveAreaLUAPanic did
+            // nothing most of the time)
+            {
+                let cmd = format!("C:MoveToArea(\"{name}\")");
+                let txt = format!(
+                    "{name}: a playable area made with MapSmithEE.\r\n\r\n\
+                     1. Copy every file of this folder except preview.jpg and this file into the game's override folder.\r\n\
+                     2. In Baldur.lua (Documents\\<game>), set: SetPrivateProfileString('Program Options','Debug Mode','1')\r\n\
+                     3. Load a game, select the whole party, press Ctrl+Space and type:\r\n\r\n   {cmd}\r\n\r\n\
+                     The selected characters are taken to the area. Walk into an exit with the whole party to reach the world map.\r\n"
+                );
+                write("HOW_TO_TEST.txt".into(), txt.as_bytes())?;
+                report.console = Some(cmd);
+            }
+        }
     }
 
     progress(92, "Preview");

@@ -419,6 +419,7 @@ fn camp3d_render_targets() -> Vec<&'static str> {
 struct RenderAreaReport {
     out_dir: String,
     files: Vec<String>,
+    console: Option<String>,
     walls: usize,
     seconds: u64,
 }
@@ -511,7 +512,7 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
         let opts = campbuild::BuildOptions { name, mode, out_dir: out_dir.clone() };
         let rep = campbuild::build(&input, &opts, &|p, step| emit(night_end + p * (100 - night_end) / 100, format!("Area: {step}")))?;
         emit(100, "Done".into());
-        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, walls: rep.walls, seconds: started.elapsed().as_secs() })
+        Ok(RenderAreaReport { out_dir: out_dir.to_string_lossy().into_owned(), files: rep.files, console: rep.console, walls: rep.walls, seconds: started.elapsed().as_secs() })
     })
     .await
     .map_err(|e| e.to_string())?

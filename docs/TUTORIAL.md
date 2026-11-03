@@ -178,26 +178,32 @@ The result is in `Documents\MapSmithEE\AR9900`:
 | `AR9900SR.BMP` | search map (walkable cells) |
 | `AR9900HT.BMP`, `AR9900LM.BMP`, `AR9900LN.BMP` | height map, day and night light maps |
 | `preview.jpg` | the render with walls (cyan), blocked cells (red), exits and spots drawn on it |
+| `HOW_TO_TEST.txt` | how to try the area in the game, with its console line |
 
 ![The Camp, rendered](img/render-day.jpg)
 
 ## 13. Play it in the game
 
-1. Copy every file of the area folder **except `preview.jpg`** into the game's `override` folder (for example
-   `Baldur's Gate Enhanced Edition\override`). Better on a copy of the game, or with a mod manager.
-2. Start the game and load a save.
-3. Open the console: in `Baldur.lua` (in `Documents\Baldur's Gate - Enhanced Edition`), set
-   `SetPrivateProfileString('Program Options','Debug Mode','1')`; in the game press **Ctrl+Space** and type:
+When the render ends, the dialog shows a console line for your area, and the area folder holds the same steps in
+`HOW_TO_TEST.txt`.
+
+1. Copy every file of the area folder **except `preview.jpg` and `HOW_TO_TEST.txt`** into the game's `override` folder
+   (for example `Baldur's Gate Enhanced Edition\override`). Better on a copy of the game, or with a mod manager.
+2. Turn the console on: in `Baldur.lua` (in `Documents\Baldur's Gate - Enhanced Edition`), set
+   `SetPrivateProfileString('Program Options','Debug Mode','1')`.
+3. Load a game, select the whole party, press **Ctrl+Space** and type the line from the dialog, for example:
 
    ```
-   C:Eval('LeaveAreaLUAPanic("AR9900","Entry",[0.0],0)')
+   C:MoveToArea("AR9900")
    ```
 
-   The party arrives on your arrival point.
-4. Walk to an exit with the whole party to go back to the world map.
+   The selected characters are taken to your area (the game picks where they land).
+4. Walk into an exit with the whole party to go back to the world map.
 
-The new area is not on the world map. To make it part of a mod, add a link to it with your mod's tools (worldmap entry,
-or a script / dialogue that uses `LeaveAreaLUA`).
+![A small test area made with MapSmithEE, in BGEE](img/ingame.jpg)
+
+The new area is not on the world map. To make it part of a mod, link to it with your mod's tools (a world map entry, or
+a script or dialogue that uses `LeaveAreaLUA`).
 
 ## 14. Shortcuts
 

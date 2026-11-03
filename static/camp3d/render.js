@@ -115,6 +115,8 @@
       const r = await invoke('camp3d_render_area', { req: { map_id: mapId, name, night: $('rdNight').checked, samples: +$('rdQ').value, target } });
       lastOut = r.out_dir;
       setBar(100, `Done: ${r.files.length} files in ${r.out_dir}`);
+      // a new area: the console line that takes the party there (also in HOW_TO_TEST.txt)
+      if (r.console) $('rdStep').innerHTML = `Done: ${r.files.length} files in ${r.out_dir}<br>To test it, copy them into the game's override folder, select the party in the game and type in its console (Ctrl+Space):<br><code style="user-select:all;color:var(--fg)">${r.console.replace(/</g, '&lt;')}</code>`;
       $('rdGo').textContent = 'Render again';
     } catch (e) {
       $('rdStep').textContent = String(e).includes('cancelled') ? 'Stopped.' : 'Render failed: ' + e;
