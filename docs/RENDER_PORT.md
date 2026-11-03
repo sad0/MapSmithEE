@@ -19,6 +19,8 @@ Reference implementation (Python, read only): `E:/AI/bg3d/tools/` — `render_sc
    (generic: entrance from the ENTRY spot moved out of exits, exits as travel regions, flame animations; SadoQoL mode adds
    the priest/merchant actors and `M_SQ0CMP.lua` + vision circle), `preview.jpg`. Reuse `are.rs`, `wed.rs`, `bmpmap.rs`.
    PVRZ naming rule: TIS `AR9900` -> pages `A990000..`; a generic name must be 6 characters so pages stay 8.
+   Done 2026-11-03: command `campbuild_run`, golden test `tests/campbuild_golden.rs` (search map, walls, WED and ARE
+   byte-identical to the Python; DXT1 adds a least-squares refit, +0.6 dB). The camp sight circle (VISION) is dropped.
 2. **camprender** (Rust, `src-tauri/src/camprender/`): `render_scene.py` + `canvas.py` + `groundadj.py` in Rust
    (cloth PNGs, adjusted ground textures), then `blender -b -P render_map.py -- ...` with paths from settings (Blender
    exe, model library folder). The Blender scripts ship in `src-tauri/resources/blender/` with every `E:/AI/bg3d` path

@@ -2,6 +2,7 @@
 
 pub mod are;
 pub mod bmpmap;
+pub mod campbuild;
 pub mod camp3d;
 pub mod library;
 pub mod render;
@@ -360,6 +361,30 @@ fn area_install(app: tauri::AppHandle, name: String, target: String) -> Res<Vec<
     Ok(done)
 }
 
+#[derive(Serialize, Clone)]
+struct CampbuildProgress {
+    pct: u32,
+    step: String,
+}
+
+/// build a Camp 3D map into a playable area in `opts.out_dir` (refuses protected folders); progress events
+/// "campbuild-progress" {pct, step}
+#[tauri::command]
+async fn campbuild_run(app: tauri::AppHandle, input: campbuild::BuildInput, opts: campbuild::BuildOptions) -> Res<campbuild::BuildReport> {
+    use tauri::Emitter;
+    let s = load_settings(&app);
+    if is_blocked(&s, &opts.out_dir) {
+        return Err(format!("{} is a protected folder", opts.out_dir.display()));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        campbuild::build(&input, &opts, &|pct, step| {
+            let _ = app.emit("campbuild-progress", CampbuildProgress { pct, step: step.to_string() });
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = App::default();
@@ -393,7 +418,8 @@ pub fn run() {
             camp3d::camp3d_get,
             camp3d::camp3d_set,
             camp3d::camp3d_update,
-            camp3d::camp3d_delete
+            camp3d::camp3d_delete,
+            campbuild_run
         ])
         .run(tauri::generate_context!())
         .expect("error while running MapSmithEE");

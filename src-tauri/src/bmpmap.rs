@@ -65,6 +65,28 @@ pub fn parse(b: &[u8]) -> Res<BmpMap> {
     Ok(BmpMap { w: w as u32, h: h as u32, bpp, palette, pixels: B64.encode(&px), head: B64.encode(&b[..off]), tail: B64.encode(&b[end..]) })
 }
 
+impl BmpMap {
+    /// a new bitmap: `palette` 4 bytes per colour (BGR + 0), `px` one index per pixel, top row first
+    pub fn new(w: u32, h: u32, bpp: u16, palette: &[u8], px: &[u8]) -> BmpMap {
+        let ncol = palette.len() / 4;
+        let off = 14 + 40 + ncol * 4;
+        let mut head = vec![0u8; 14];
+        head[0..2].copy_from_slice(b"BM");
+        head[10..14].copy_from_slice(&(off as u32).to_le_bytes());
+        for v in [40u32, w, h] {
+            head.extend_from_slice(&v.to_le_bytes());
+        }
+        head.extend_from_slice(&1u16.to_le_bytes());
+        head.extend_from_slice(&bpp.to_le_bytes());
+        for v in [0u32, 0, 2835, 2835, ncol as u32, 0] {
+            head.extend_from_slice(&v.to_le_bytes());
+        }
+        head.extend_from_slice(&palette[..ncol * 4]);
+        let pal = palette.chunks(4).map(|c| [c[2], c[1], c[0]]).collect();
+        BmpMap { w, h, bpp, palette: pal, pixels: B64.encode(px), head: B64.encode(&head), tail: String::new() }
+    }
+}
+
 pub fn write(m: &BmpMap) -> Res<Vec<u8>> {
     let px = B64.decode(&m.pixels).map_err(|e| e.to_string())?;
     let mut out = B64.decode(&m.head).map_err(|e| e.to_string())?;
