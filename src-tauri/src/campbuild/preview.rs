@@ -129,9 +129,11 @@ const YELLOW: Rgb = [255, 255, 0];
 
 pub fn draw(rgb: &[u8], w: usize, h: usize, a: &Area) -> Result<Vec<u8>, String> {
     let mut c = Canvas { w: w as i32, h: h as i32, px: rgb.to_vec() };
+    // the search map has whole cells only (floor of w / 16 by h / 12): the last few pixel rows / columns have none
     let cw = w / 16;
-    for y in 0..h {
-        for x in 0..w {
+    let ch = a.search.len() / cw.max(1);
+    for y in 0..h.min(ch * 12) {
+        for x in 0..w.min(cw * 16) {
             if a.search[(y / 12) * cw + x / 16] == BLOCK {
                 let o = (y * w + x) * 3;
                 for k in 0..3 {
