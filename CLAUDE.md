@@ -20,4 +20,5 @@ Clean-room take on the feature list of Bubb's "Infinity Areas": never copy its c
 - Credits: `python tools/gen_credits.py` rewrites CREDITS.md; README thanks everyone (the goal is to share the tool).
 - Code, comments, UI in English. Replies to John in French.
 - KNOWN BUG (2026-11-02): BGEE 2.7.3 crashed loading a save with MapSmithEE-written AR2600.WED/AR2600N.WED/AR2600SR.BMP in
-  override (files kept in E:/Dev/MapSmithEE-scratch/held). Bisect before trusting area saves in game.
+  override (files kept in E:/Dev/MapSmithEE-scratch/held). Bisect before trusting area saves in game. Lead suspect:
+  wed::write keeps only the overlays it read, while every working WED (game, build_camp3d) declares 5 overlay slots.
