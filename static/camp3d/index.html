@@ -401,6 +401,7 @@ function setMapSize(t, keep) {
   orbit.target.set(W / 2, 0, D / 2); camFree.position.set(W / 2, 30, D + 25);
   if (groundImgs.length) buildPatterns();
   compose(0, 0, GROUND_PX[0], GROUND_PX[1]); camBG.zoom = 1; placeBG();
+  if (hist.length) histReset();   // ground steps hold mask pixels of the old size
   $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera 38°`;
 }
 async function loadGround() {
@@ -455,6 +456,7 @@ function compose(x, y, w, h) {
 function paintAt(pt) {
   const r = +$('bSize').value, a = +$('bStr').value;
   const mx = pt.x / W * MASK[0], my = pt.z / D * MASK[1], mr = r / W * MASK[0];
+  groundGrow(mx, my, mr * 1.5);   // (the jittered dabs reach 1.45 radii)
   const c = masks[layer].getContext('2d'); layerUsed[layer] = true;
   // a soft core plus small jittered dabs, so a painted edge is ragged like a real path, not a clean circle
   const dab = (x, y, r, al) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(255,255,255,${al})`); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
@@ -488,6 +490,44 @@ function pickGround(pt) {
 }
 $('pick').onclick = () => setPicking(!picking);
 
+/* ---------- ground undo: a stroke keeps the changed part of each layer it touched, before and after ---------- */
+let gStroke = null;
+function groundBegin() {
+  gStroke = { layers: [], full: [], box: null };
+  for (let i = layer; i < masks.length; i++) {
+    if (i !== layer && !layerUsed[i]) continue;   // an empty layer stays empty
+    const c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1]; c.getContext('2d').drawImage(masks[i], 0, 0);
+    gStroke.layers.push(i); gStroke.full.push(c);
+  }
+}
+function groundGrow(x, y, r) {
+  if (!gStroke) return; const b = gStroke.box;
+  const n = [Math.floor(x - r - 2), Math.floor(y - r - 2), Math.ceil(x + r + 2), Math.ceil(y + r + 2)];
+  gStroke.box = b ? [Math.min(b[0], n[0]), Math.min(b[1], n[1]), Math.max(b[2], n[2]), Math.max(b[3], n[3])] : n;
+}
+function groundEnd() {
+  const g = gStroke; gStroke = null; if (!g || !g.box) return;
+  const x = Math.max(0, g.box[0]), y = Math.max(0, g.box[1]), w = Math.min(MASK[0], g.box[2]) - x, h = Math.min(MASK[1], g.box[3]) - y;
+  if (w <= 0 || h <= 0) return;
+  histPush({ s: hist[hpos].s, g: { rect: [x, y, w, h], layers: g.layers,
+    before: g.full.map(c => c.getContext('2d').getImageData(x, y, w, h)),
+    after: g.layers.map(i => masks[i].getContext('2d').getImageData(x, y, w, h)) } });
+}
+// a colour change of a layer, as one step (the slider's release, or Reset colour)
+let adjBefore = null;
+function adjCommit() {
+  if (!adjBefore) return; const b = adjBefore; adjBefore = null;
+  if (JSON.stringify(b.a) === JSON.stringify(adj[b.i])) return;
+  histPush({ s: hist[hpos].s, g: { adj: b.i, before: b.a, after: { ...adj[b.i] } } });
+}
+function groundApply(g, side) {
+  if (g.adj !== undefined) { adj[g.adj] = { ...g[side] }; layer = g.adj; showAdj(); adjChanged(); return; }
+  const [x, y, w, h] = g.rect;
+  g.layers.forEach((i, k) => { masks[i].getContext('2d').putImageData(g[side][k], x, y); layerUsed[i] = true; dirtyLayers.add(i); });
+  const kx = GROUND_PX[0] / MASK[0], ky = GROUND_PX[1] / MASK[1];
+  compose(x * kx - 2, y * ky - 2, w * kx + 4, h * ky + 4); maskDirty = true; changedGround();
+}
+
 /* ---------- ground colour per layer ---------- */
 const ADJ_IN = { aH: 'h', aS: 's', aB: 'b', aC: 'c' };
 function showAdj() {
@@ -512,8 +552,11 @@ function adjChanged() {
   clearTimeout(adjT); const i = layer;
   adjT = setTimeout(() => { buildPattern(i); compose(0, 0, GROUND_PX[0], GROUND_PX[1]); maskDirty = true; changedGround(); }, 120);
 }
-for (const [id, k] of Object.entries(ADJ_IN)) $(id).addEventListener('input', () => { adj[layer][k] = +$(id).value; showAdj(); adjChanged(); });
-$('aReset').onclick = () => { adj[layer] = { ...ADJ0 }; showAdj(); adjChanged(); };
+for (const [id, k] of Object.entries(ADJ_IN)) {
+  $(id).addEventListener('input', () => { if (!adjBefore) adjBefore = { i: layer, a: { ...adj[layer] } }; adj[layer][k] = +$(id).value; showAdj(); adjChanged(); });
+  $(id).addEventListener('change', adjCommit);
+}
+$('aReset').onclick = () => { adjBefore = { i: layer, a: { ...adj[layer] } }; adj[layer] = { ...ADJ0 }; showAdj(); adjChanged(); adjCommit(); };
 
 /* ---------- game scale, and BG's people at their real size ---------- */
 // the game scale hides behind a button: rarely changed, and a change resizes everything
@@ -1042,7 +1085,7 @@ $('cv').addEventListener('pointerdown', async e => {
     return;
   }
   if (tool === 'paint' && picking) { const h = hit(e, [groundNow()]); if (h) pickGround(h.point); return; }
-  stroke = { last: null }; $('cv').setPointerCapture(e.pointerId); strokeAt(e);
+  stroke = { last: null }; if (tool === 'paint') groundBegin(); $('cv').setPointerCapture(e.pointerId); strokeAt(e);
 });
 $('cv').addEventListener('pointermove', e => {
   if (dragSpot) { const h = hit(e, [groundNow()]); if (h) { S.spots[dragSpot].p = [+h.point.x.toFixed(2), +h.point.z.toFixed(2)]; drawCamp(); } return; }
@@ -1096,7 +1139,7 @@ addEventListener('keydown', e => {
   brushRing.scale.setScalar(+el.value); $(id + 'L').textContent = (+el.value).toFixed(1) + ' m';
 });
 ['bSize', 'tSize', 'wSize'].forEach(id => $(id).addEventListener('input', () => { brushRing.scale.setScalar(+$(id).value); $(id + 'L').textContent = (+$(id).value).toFixed(1) + ' m'; }));
-$('cv').addEventListener('pointerup', () => { if (stroke && tool === 'trees') changed(); if (stroke && tool === 'walk') changedWalk(); stroke = null; });
+$('cv').addEventListener('pointerup', () => { if (stroke && tool === 'paint') groundEnd(); if (stroke && tool === 'trees') changed(); if (stroke && tool === 'walk') changedWalk(); stroke = null; });
 function strokeAt(e) {
   const h = hit(e, [groundNow()]); if (!h) return;
   if (tool === 'paint') { if (!stroke.last || stroke.last.distanceTo(h.point) > +$('bSize').value * 0.25) { paintAt(h.point); stroke.last = h.point.clone(); } }
@@ -1341,13 +1384,18 @@ function toast(t) { const el = $('toast'); el.textContent = t; el.style.display 
 /* ---------- saving ---------- */
 function status(t, k) { const s = $('status'); s.textContent = t; s.className = 'status' + (k ? ' ' + k : ''); }
 let saveT = null, saving = false, dirty = false, gSaveT = null, gSaving = false;
-// undo / redo: the map's pieces, people, exits and light after each change (not the painted ground or walkable cells)
+// undo / redo: the map's pieces, people, exits and light after each change, plus each ground stroke and ground colour
+// change (not the walkable cells)
 let hist = [], hpos = -1, restoring = false;
 const snapState = () => JSON.stringify({ items: S.items, spots: S.spots, exits: S.exits, time: S.time });
-function histReset() { hist = [snapState()]; hpos = 0; }
+function histReset() { hist = [{ s: snapState() }]; hpos = 0; }
+function histPush(e) { hist = hist.slice(0, hpos + 1); hist.push(e); if (hist.length > 60) hist.shift(); hpos = hist.length - 1; }
 async function histGo(d) {
   const i = hpos + d; if (i < 0 || i >= hist.length || restoring) return;
-  restoring = true; const st = JSON.parse(hist[i]);
+  // a ground edit: undo puts back the step's "before", redo its "after"
+  const ge = d < 0 ? hist[hpos].g : hist[i].g;
+  if (ge) { groundApply(ge, d < 0 ? 'before' : 'after'); hpos = i; toast(d < 0 ? `Undone (${hpos} more back)` : `Redone (${hist.length - 1 - hpos} more ahead)`); return; }
+  restoring = true; const st = JSON.parse(hist[i].s);
   select(null); for (const o of objs.splice(0)) root.remove(o.node);
   S.items = st.items; S.spots = st.spots; S.exits = st.exits;
   await Promise.all(S.items.map(spawn)); setTime(st.time); drawCamp(); if (walkPlane.visible) refreshWalk();
@@ -1366,7 +1414,7 @@ function changed() {
   if (calib || !mapDoc || !canWrite) return;
   if (!restoring) {
     const st = snapState();
-    if (st !== hist[hpos]) { hist = hist.slice(0, hpos + 1); hist.push(st); if (hist.length > 60) hist.shift(); hpos = hist.length - 1; }
+    if (st !== hist[hpos].s) histPush({ s: st });
   }
   dirty = true; status('Unsaved…'); clearTimeout(saveT); saveT = setTimeout(save, 1200);
 }
