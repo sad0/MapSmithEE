@@ -74,6 +74,7 @@ def mix(a, b, fac, kind='RGBA'):
 col = None; hgt = None
 for i, name in enumerate(G['layers']):
     tm = TEXM_BY.get(name, G.get('tex_m', 4))
+    name = name.split('~')[0]   # a variant ("dirt~2": its own colour) uses its base layer's texture
     tile = nt.nodes.new('ShaderNodeMapping'); tile.inputs['Scale'].default_value = (W / tm, D / tm, 1)
     nt.links.new(uv.outputs['UV'], tile.inputs[0])
     t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(TEXFILES.get(str(i)) or f'{TEX}/{name}/diff_2k.jpg'); nt.links.new(tile.outputs[0], t.inputs[0])

@@ -276,7 +276,8 @@ fn prepare(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBoo
         if cancel.load(Ordering::Relaxed) {
             return Err("cancelled".into());
         }
-        let src = lib.join("tex").join(name).join("diff_2k.jpg");
+        // a variant ("dirt~2": the same texture, its own colour) reads its base layer's texture
+        let src = lib.join("tex").join(name.split('~').next().unwrap_or(name)).join("diff_2k.jpg");
         let out = groundadj::make(&src, name, a, &work.join("ground"))?;
         texfiles.insert(i.to_string(), path_str(&out));
     }

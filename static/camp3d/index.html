@@ -33,8 +33,12 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
 .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
 .sw{height:44px;background-size:cover;border:2px solid transparent;border-radius:4px;font-size:10px;display:flex;align-items:flex-end;padding:2px;text-shadow:0 1px 2px #000}
 .sw.on{border-color:var(--accent)}
+.sw.new{background:#0004;border:2px dashed var(--line);justify-content:center;align-items:center;font-size:12px;color:var(--mute)}
+#variants{max-height:150px;overflow:auto}
 #swatches{max-height:260px;overflow:auto}
 .hint{color:var(--mute);font-size:11px;margin:4px 0}
+.hint.bad{color:var(--warn)}
+#boxSel{position:absolute;border:1px dashed var(--accent);background:#d9a44122;pointer-events:none}
 #giz{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
 #giz b{position:absolute;pointer-events:auto;cursor:grab;width:26px;height:26px;margin:-13px 0 0 -13px;display:flex;align-items:center;justify-content:center;
   font-size:16px;line-height:1;border-radius:4px;color:#fff;text-shadow:0 1px 2px #000;user-select:none;touch-action:none}
@@ -82,6 +86,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
     </div>
     <div class="row"><button id="mpOk" class="on">OK</button><button id="mpCancel">Cancel</button></div>
   </div>
+  <div id="boxSel" hidden></div>
   <div id="giz" hidden>
     <b class="gy" data-ax="y" title="Height">▲</b><b class="gz" data-ax="z" title="Depth (towards / away from the camera)">▼</b>
     <b class="gx" data-ax="x" title="Left / right">▶</b><b class="gc" data-ax="ground" title="Slide on the ground">✥</b>
@@ -103,7 +108,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
     <div class="row"><label>Saturation</label><input id="oS" type="range" min="0" max="2" step="0.02" style="flex:1"><span id="oSL" class="lbl"></span></div>
     <div class="row"><label>Brightness</label><input id="oB" type="range" min="0.3" max="1.7" step="0.02" style="flex:1"><span id="oBL" class="lbl"></span></div>
     <div class="row"><label>Contrast</label><input id="oC" type="range" min="0.4" max="1.8" step="0.02" style="flex:1"><span id="oCL" class="lbl"></span></div>
-    <div class="row"><button id="oReset">Reset colour</button><span class="hint">this piece only (duplicates keep it)</span></div>
+    <div class="row"><button id="oReset">Reset colour</button><span class="hint">the selected pieces only (duplicates keep it)</span></div>
     <div id="flameBox" hidden>
       <h2>Flame</h2>
       <div class="row"><label>In game</label><select id="selFlame" style="flex:1"><option value="">No flame</option><option value="FPIT1S">Small camp fire</option><option value="FPIT1M">Medium camp fire</option><option value="FPIT1L">Large camp fire</option></select></div>
@@ -122,8 +127,11 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
     </div>
   </div>
   <div id="paintBox" hidden>
+    <div class="row"><button id="pick" title="Click the ground to pick the layer painted there">Pipette (I)</button><span class="hint">pick a ground on the map</span></div>
     <h2>Ground</h2>
     <div class="swatches" id="swatches"></div>
+    <div class="hint">Variants of this ground (own colour):</div>
+    <div class="swatches" id="variants"></div>
     <h2 id="adjT">Colour</h2>
     <div class="row"><label>Hue</label><input id="aH" type="range" min="-180" max="180" step="2" style="flex:1"><span id="aHL" class="lbl"></span></div>
     <div class="row"><label>Saturation</label><input id="aS" type="range" min="0" max="2" step="0.02" style="flex:1"><span id="aSL" class="lbl"></span></div>
@@ -162,11 +170,16 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
     <div class="row"><label>Erase</label><input id="tErase" type="checkbox"> <span class="hint">remove trees under the brush</span></div>
   </div>
   <h2>Map</h2>
-  <div class="row"><label>Game scale</label><input id="pxm" type="range" min="24" max="64" step="1" value="42" style="flex:1"><span id="pxmL" class="lbl">42 px/m</span><button id="pxmApply" hidden>Apply</button></div>
-  <div class="hint">Fewer px/m = smaller objects next to the game's characters. The map keeps its size in metres; its tile count follows.</div>
   <div class="row"><label><input id="people" type="checkbox"> Show BG people</label></div>
   <div class="hint">At their real size in the game: an NPC on each camp spot, a party (human, elf, dwarf, halfling) at the arrival point.</div>
   <div class="hint" id="mapInfo"></div>
+  <div class="row"><button id="pxmOpen" title="Rarely needed: changes the size of everything next to the game's characters">Change game scale…</button></div>
+  <div id="pxmBox" hidden>
+    <div class="hint bad">Changes the size of every object next to the game's characters and the map's tile count. Rarely needed.</div>
+    <div class="row"><label>Game scale</label><input id="pxm" type="range" min="24" max="64" step="1" value="42" style="flex:1"><span id="pxmL" class="lbl">42 px/m</span></div>
+    <div class="row"><button id="pxmApply" hidden>Apply</button><button id="pxmClose">Cancel</button></div>
+    <div class="hint">Fewer px/m = smaller objects next to the game's characters. The map keeps its size in metres; its tile count follows.</div>
+  </div>
   <div class="hint">Controls: left drag = tool · wheel = zoom · middle drag = pan · Free view: right drag = orbit.</div>
 </aside>
 
@@ -236,6 +249,11 @@ const GROUNDS = [
   { id: 'acifer_BG2_floor_01', name: 'BG2 earth', px: 512 }, { id: 'acifer_BG2_floor_02', name: 'BG2 earth 2', px: 512 },
   { id: 'acifer_BG-Cobbles_01', name: 'BG cobbles', px: 256 }, { id: 'acifer_BG_Rock01', name: 'BG rock', px: 1024 },
   { id: 'acifer_BG-Rocks_05', name: 'BG rocks', px: 512 }, { id: 'acifer_BG_Water01', name: 'BG water', px: 512 }];
+// a map's own variants of a layer ("dirt~2", named "Dirt path 2"): the same texture with its own colour and mask,
+// added after the built-in layers (in the order they were made), so they paint on top of them
+const BASE_N = GROUNDS.length;
+const baseId = id => id.split('~')[0];
+const baseOf = i => i < BASE_N ? i : GROUNDS.findIndex(g => g.id === baseId(GROUNDS[i].id));
 // metres covered by one image of a layer
 const texM = i => GROUNDS[i].px ? GROUNDS[i].px / PXM : TEX_M;
 // per-layer colour: hue (degrees), saturation, brightness, contrast; the same CSS filter maths in tools/render_scene.py
@@ -386,16 +404,33 @@ function setMapSize(t, keep) {
   $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera 38°`;
 }
 async function loadGround() {
-  groundImgs = await Promise.all(GROUNDS.map(g => loadImg(`tex/${g.id}.jpg`)));
+  groundImgs = await Promise.all(GROUNDS.map(g => loadImg(`tex/${baseId(g.id)}.jpg`)));
   buildPatterns();
   const base = masks[0].getContext('2d'); base.fillStyle = '#fff'; base.fillRect(0, 0, MASK[0], MASK[1]);   // grass everywhere at first
   compose(0, 0, GROUND_PX[0], GROUND_PX[1]);
   const sw = $('swatches');
   GROUNDS.forEach((g, i) => {
-    const b = document.createElement('button'); b.className = 'sw' + (i === layer ? ' on' : ''); b.style.backgroundImage = `url(tex/${g.id}.jpg)`; b.textContent = g.name;
-    b.onclick = () => { layer = i; [...sw.children].forEach((c, j) => c.classList.toggle('on', j === i)); showAdj(); }; sw.appendChild(b);
+    const b = document.createElement('button'); b.className = 'sw'; b.style.backgroundImage = `url(tex/${g.id}.jpg)`; b.textContent = g.name;
+    b.onclick = () => { layer = i; showAdj(); }; sw.appendChild(b);
   });
   showAdj();
+}
+function addLayer(def) {
+  const i = GROUNDS.push(def) - 1, c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1];
+  masks.push(c); groundImgs[i] = groundImgs[baseOf(i)]; adj[i] = { ...ADJ0 }; layerUsed[i] = false;
+  if (groundImgs[i]) buildPattern(i);
+  return i;
+}
+// back to the built-in layers only (another map opens)
+function dropVariants() { GROUNDS.length = BASE_N; masks.length = BASE_N; groundImgs.length = Math.min(groundImgs.length, BASE_N); patterns.length = Math.min(patterns.length, BASE_N); }
+// "+ New": the next variant of the chosen layer, starting from its current colour
+function newVariant() {
+  const b = baseOf(layer), g = GROUNDS[b];
+  const used = GROUNDS.filter(x => baseId(x.id) === g.id && x.id.includes('~')).map(x => +x.id.split('~')[1]);
+  const n = Math.max(1, ...used) + 1;
+  const i = addLayer({ id: `${g.id}~${n}`, name: `${g.name} ${n}`, ...(g.px ? { px: g.px } : {}) });
+  adj[i] = { ...adj[layer] }; buildPattern(i); layer = i; showAdj();
+  dirtyLayers.add(i); maskDirty = true; changedGround(); toast(`${GROUNDS[i].name}: paint it, then change its colour`);
 }
 const tmp = document.createElement('canvas');
 function compose(x, y, w, h) {
@@ -435,12 +470,41 @@ function paintAt(pt) {
   compose(gx - gr, gy - gr, gr * 2, gr * 2); for (let i = layer; i < masks.length; i++) dirtyLayers.add(i); maskDirty = true; changedGround();
 }
 
+// pipette: the next click on the ground picks the layer that shows there (the top one painted at least half), then
+// the brush goes on with it
+let picking = false;
+function setPicking(on) {
+  if (on && tool !== 'paint') setTool('paint');
+  picking = on; $('pick').classList.toggle('on', on); $('cv').style.cursor = on ? 'crosshair' : '';
+}
+function pickGround(pt) {
+  const mx = Math.min(MASK[0] - 1, Math.max(0, Math.floor(pt.x / W * MASK[0]))), my = Math.min(MASK[1] - 1, Math.max(0, Math.floor(pt.z / D * MASK[1])));
+  let found = 0;
+  for (let i = GROUNDS.length - 1; i > 0; i--) {
+    if (!layerUsed[i]) continue;
+    if (masks[i].getContext('2d').getImageData(mx, my, 1, 1).data[3] >= 128) { found = i; break; }
+  }
+  layer = found; showAdj(); setPicking(false); toast(`Picked: ${GROUNDS[found].name}`);
+}
+$('pick').onclick = () => setPicking(!picking);
+
 /* ---------- ground colour per layer ---------- */
 const ADJ_IN = { aH: 'h', aS: 's', aB: 'b', aC: 'c' };
 function showAdj() {
   const a = adj[layer] || ADJ0; $('adjT').textContent = 'Colour: ' + GROUNDS[layer].name;
   for (const [id, k] of Object.entries(ADJ_IN)) { $(id).value = a[k]; $(id + 'L').textContent = k === 'h' ? a[k] + '°' : (+a[k]).toFixed(2); }
-  [...$('swatches').children].forEach((c, j) => c.style.filter = cssFilter(adj[j] || ADJ0));
+  const b = baseOf(layer);
+  [...$('swatches').children].forEach((c, j) => { c.style.filter = cssFilter(adj[j] || ADJ0); c.classList.toggle('on', j === b); });
+  // the chosen layer's variants: the default first, then the map's own ones, then "+ New"
+  const vs = $('variants'); vs.innerHTML = '';
+  GROUNDS.forEach((g, i) => {
+    if (i !== b && !(i >= BASE_N && baseOf(i) === b)) return;
+    const el = document.createElement('button'); el.className = 'sw' + (i === layer ? ' on' : ''); el.textContent = g.name;
+    el.style.backgroundImage = `url(tex/${baseId(g.id)}.jpg)`; el.style.filter = cssFilter(adj[i] || ADJ0);
+    el.onclick = () => { layer = i; showAdj(); }; vs.appendChild(el);
+  });
+  const nb = document.createElement('button'); nb.className = 'sw new'; nb.textContent = '+ New'; nb.title = 'A new variant of this ground with its own colour';
+  nb.onclick = newVariant; vs.appendChild(nb);
 }
 let adjT = null;
 function adjChanged() {
@@ -452,10 +516,14 @@ for (const [id, k] of Object.entries(ADJ_IN)) $(id).addEventListener('input', ()
 $('aReset').onclick = () => { adj[layer] = { ...ADJ0 }; showAdj(); adjChanged(); };
 
 /* ---------- game scale, and BG's people at their real size ---------- */
+// the game scale hides behind a button: rarely changed, and a change resizes everything
+const pxmShut = () => { $('pxmBox').hidden = true; $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m'; $('pxmApply').hidden = true; };
+$('pxmOpen').onclick = () => { if ($('pxmBox').hidden) $('pxmBox').hidden = false; else pxmShut(); };
+$('pxmClose').onclick = pxmShut;
 $('pxm').addEventListener('input', () => { $('pxmL').textContent = $('pxm').value + ' px/m'; $('pxmApply').hidden = +$('pxm').value === PXM; });
 // nothing changes until Apply: a stray drag of the slider once rebuilt a whole map
 $('pxmApply').onclick = () => {
-  const p = +$('pxm').value; $('pxmApply').hidden = true; if (p === PXM) return;
+  const p = +$('pxm').value; $('pxmApply').hidden = true; $('pxmBox').hidden = true; if (p === PXM) return;
   // the ground keeps its size in metres: the tile count follows the new scale
   PXM = p; const t = [Math.max(10, Math.round(W * PXM / 64)), Math.max(8, Math.round(D * PXM * Math.sin(ELEV) / 64))];
   setMapSize(t, { ox: 0, oz: 0 });
@@ -603,16 +671,19 @@ function applyCol(o) {
 }
 const COL_IN = { oH: 'h', oS: 's', oB: 'b', oC: 'c' };
 function showCol() {
-  const c = (sel && sel.it.col) || { h: 0, s: 1, b: 1, c: 1 };
+  const f = members()[0], c = (f && f.it.col) || { h: 0, s: 1, b: 1, c: 1 };
   for (const [id, k] of Object.entries(COL_IN)) { $(id).value = c[k]; $(id + 'L').textContent = k === 'h' ? c[k] + '°' : (+c[k]).toFixed(2); }
 }
 for (const [id, k] of Object.entries(COL_IN)) $(id).addEventListener('input', () => {
   if (!sel) return;
-  const c = sel.it.col || { h: 0, s: 1, b: 1, c: 1 }; c[k] = +$(id).value;
-  if (isPlain(c)) delete sel.it.col; else sel.it.col = c;
-  applyCol(sel); showCol(); changed();
+  for (const o of members()) {
+    const c = { h: 0, s: 1, b: 1, c: 1, ...o.it.col }; c[k] = +$(id).value;
+    if (isPlain(c)) delete o.it.col; else o.it.col = c;
+    applyCol(o);
+  }
+  showCol(); changed();
 });
-$('oReset').onclick = () => { if (!sel) return; delete sel.it.col; applyCol(sel); showCol(); changed(); };
+$('oReset').onclick = () => { if (!sel) return; for (const o of members()) { delete o.it.col; applyCol(o); } showCol(); changed(); };
 
 /* ---------- tent canvas: the twin of tools/canvas.py (same parameters, same image), one texture per look ---------- */
 const grainImg = loadImg('tex/canvas_grain.jpg'), texCache = new Map();
@@ -726,6 +797,7 @@ async function saveCalib() {
   endCalib();
 }
 function sync(o) {
+  if (o.group) { applyGroup(o); return; }
   o.it.p = o.node.position.toArray().map(v => +v.toFixed(3)); o.it.q = o.node.quaternion.toArray().map(v => +v.toFixed(5));
   if (o.it.m !== 'flame') o.it.s = +(o.node.scale.y / ((o.it.sz && o.it.sz[1]) || 1)).toFixed(3);
   if (o.it.m === 'flame') {
@@ -752,6 +824,7 @@ $('selFlame').onchange = () => {
   sel.it.bam = v; sel.it.s = FIRE_SIZE[v]; refreshFlame(sel); showSel(); changed();
 };
 function restOnGround(o) {
+  if (o.group) { applyGroup(o); for (const m of o.objs) restOnGround(m); rebase(o); placeHelpers(); return; }
   if (o.it.m === 'flame') return;
   if (M[o.it.m] && M[o.it.m].px) { o.node.position.y = 0; sync(o); return; }
   const b = new THREE.Box3().setFromObject(o.node); o.node.position.y -= b.min.y; sync(o);
@@ -763,7 +836,57 @@ tc.addEventListener('dragging-changed', e => { orbit.enabled = cam === camFree &
 tc.addEventListener('objectChange', () => { if (sel) { sync(sel); showSel(); } });
 let sel = null, tool = 'sel', placing = null, pickCycle = null;
 function select(o) {
-  sel = o; if (o) tc.attach(o.node); else tc.detach(); showSel(); gizmoMode();
+  sel = o; if (o) tc.attach(o.node); else tc.detach(); if (!o || !o.group) helpers.clear(); showSel(); gizmoMode();
+}
+// several pieces (and camp spots) at once: a box drawn in Select, Shift adds, Ctrl+click removes. The gizmo holds a
+// pivot at the group's centre; moving, turning or scaling it carries every member along (from where they were when
+// the group was made or last edited one by one)
+const pivot = new THREE.Object3D(); scene.add(pivot);
+const helpers = new THREE.Group(); scene.add(helpers);
+const members = () => sel ? (sel.group ? sel.objs : [sel]) : [];
+function selectMany(list, spots = []) {
+  list = [...new Set(list)].filter(o => objs.includes(o)); spots = [...new Set(spots)].filter(k => S.spots[k]);
+  if (!list.length && !spots.length) return select(null);
+  if (list.length === 1 && !spots.length) return select(list[0]);
+  const c = new THREE.Vector3();
+  for (const o of list) c.add(o.node.position);
+  for (const k of spots) c.add(new THREE.Vector3(S.spots[k].p[0], 0, S.spots[k].p[1]));
+  c.divideScalar(list.length + spots.length); c.y = 0;
+  pivot.position.copy(c); pivot.quaternion.identity(); pivot.scale.set(1, 1, 1);
+  const g = { group: true, node: pivot, it: { m: 'group' }, objs: list, spots };
+  rebase(g); helpers.clear();
+  for (const o of list) helpers.add(new THREE.BoxHelper(o.node, 0xffd27a));
+  for (const k of spots) {
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 24), new THREE.MeshBasicMaterial({ color: 0xffd27a, side: THREE.DoubleSide, depthTest: false }));
+    r.rotation.x = -Math.PI / 2; r.renderOrder = 10; r.userData.spot = k; helpers.add(r);
+  }
+  select(g); placeHelpers();
+}
+function rebase(g) {
+  pivot.updateMatrix(); g.p0inv = pivot.matrix.clone().invert();
+  g.m0 = g.objs.map(o => { o.node.updateMatrix(); return o.node.matrix.clone(); });
+  g.s0 = g.spots.map(k => ({ p: [...S.spots[k].p], f: S.spots[k].f }));
+}
+function placeHelpers() {
+  for (const h of helpers.children) {
+    if (h.userData.spot) { const sp = S.spots[h.userData.spot]; if (sp) h.position.set(sp.p[0], 0.04, sp.p[1]); }
+    else h.update();
+  }
+}
+function applyGroup(g) {
+  pivot.updateMatrix();
+  const d = pivot.matrix.clone().multiply(g.p0inv), t = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  d.decompose(t, q, sc);
+  g.objs.forEach((o, i) => { d.clone().multiply(g.m0[i]).decompose(o.node.position, o.node.quaternion, o.node.scale); sync(o); });
+  // a spot turns with the group in BG's 16 facings (a = f / 16 turns; a turn of the group by y takes a to a - y)
+  const yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y;
+  g.spots.forEach((k, i) => {
+    const s0 = g.s0[i], v = new THREE.Vector3(s0.p[0], 0, s0.p[1]).applyMatrix4(d);
+    S.spots[k].p = [+v.x.toFixed(2), +v.z.toFixed(2)];
+    S.spots[k].f = ((Math.round(s0.f - yaw / (Math.PI * 2) * 16) % 16) + 16) % 16;
+  });
+  if (g.spots.length) drawCamp();
+  placeHelpers();
 }
 // BG view + Move: the BG camera looks down 38°, so three's up and depth arrows fall on the same screen line. Our own
 // handles instead: ▲ height, ▼ depth, ▶ left/right, ✥ slide on the ground.
@@ -793,6 +916,12 @@ giz.addEventListener('pointermove', e => {
 });
 giz.addEventListener('pointerup', () => { if (gdrag) { gdrag = null; changed(); } });
 function showSel() {
+  if (sel && sel.group) {
+    const n = sel.objs.length, k = sel.spots.length;
+    $('selName').textContent = [n ? `${n} piece${n > 1 ? 's' : ''}` : '', k ? `${k} camp spot${k > 1 ? 's' : ''}` : ''].filter(Boolean).join(' + ') + ' (Shift+box adds, Ctrl+click removes)';
+    const f = sel.objs[0]; $('scl').value = (f && f.it.s) || 1; $('sclL').textContent = (+$('scl').value).toFixed(2);
+    showCol(); $('flameBox').hidden = true; $('tentBox').hidden = true; return;
+  }
   $('selName').textContent = sel ? (sel.it.m === 'flame' ? 'Camp fire flame (game animation)' : `${M[sel.it.m]?.name || M[sel.it.m]?.label || sel.it.m} · ${sel.it.m}`) : 'Nothing selected';
   if (sel) { $('scl').value = sel.it.s || 1; $('sclL').textContent = (+(sel.it.s || 1)).toFixed(2); }
   showCol();
@@ -821,10 +950,22 @@ $('ground').onclick = () => { if (sel) { restOnGround(sel); changed(); } };
 document.querySelectorAll('[data-turn]').forEach(b => b.onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), +b.dataset.turn * Math.PI / 180); sync(sel); changed(); });
 $('layX').onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI / 2); restOnGround(sel); changed(); };
 $('layZ').onclick = () => { if (!sel) return; sel.node.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2); restOnGround(sel); changed(); };
-$('scl').oninput = () => { if (!sel) return; sel.it.s = +$('scl').value; applyScale(sel.node, sel.it); $('sclL').textContent = (+$('scl').value).toFixed(2); if (sel.it.m === 'flame') setFlameSize(sel); restOnGround(sel); changed(); };
-async function dup() { if (!sel) return; const it = JSON.parse(JSON.stringify(sel.it)); it.p[0] += 1; it.p[2] += 1; S.items.push(it); const o = await spawn(it); select(o); changed(); }
+$('scl').oninput = () => {
+  if (!sel) return; $('sclL').textContent = (+$('scl').value).toFixed(2);
+  for (const o of members()) { o.it.s = +$('scl').value; applyScale(o.node, o.it); if (o.it.m === 'flame') setFlameSize(o); restOnGround(o); }
+  if (sel.group) { rebase(sel); placeHelpers(); }
+  changed();
+};
+async function dup() {
+  if (!sel) return; const made = [];
+  for (const m of members()) { const it = JSON.parse(JSON.stringify(m.it)); it.p[0] += 1; it.p[2] += 1; S.items.push(it); const o = await spawn(it); if (o) made.push(o); }
+  selectMany(made); changed();   // (people are not duplicated: each camp spot is one person)
+}
 function del() {
-  if (!sel) return; root.remove(sel.node); objs.splice(objs.indexOf(sel), 1); S.items.splice(S.items.indexOf(sel.it), 1); select(null); changed(); }
+  if (!sel) return;
+  for (const o of members()) { root.remove(o.node); objs.splice(objs.indexOf(o), 1); S.items.splice(S.items.indexOf(o.it), 1); }
+  select(null); changed();   // (a group's camp spots stay: they are the camp's people)
+}
 $('dup').onclick = dup; $('del').onclick = del;
 // shortcuts work everywhere except while typing (a slider or a button keeps the focus after use: it must not block them)
 const typing = t => (t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'color'].includes(t.type)) || t.tagName === 'TEXTAREA';
@@ -834,9 +975,10 @@ addEventListener('keydown', e => {
   if (k === 'w') mode('translate'); else if (k === 'e') mode('rotate'); else if (k === 'r') mode('scale');
   else if (k === 'g' && sel) { restOnGround(sel); changed(); }
   else if (k === 'q') setTool('sel');
+  else if (k === 'i' && !e.ctrlKey && !e.metaKey) setPicking(!picking);
   else if ((k === 'delete' || k === 'backspace') && sel) del();
   else if (k === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dup(); }
-  else if (k === 'escape') { placing = null; [...$('tray').children].forEach(c => c.classList.remove('pick')); select(null); }
+  else if (k === 'escape') { if (picking) setPicking(false); placing = null; [...$('tray').children].forEach(c => c.classList.remove('pick')); select(null); }
 });
 function setTool(t) {
   tool = t; ['tSel', 'tPaint', 'tTrees', 'tCamp', 'tWalk'].forEach((b, i) => $(b).classList.toggle('on', ['sel', 'paint', 'trees', 'camp', 'walk'][i] === t));
@@ -844,6 +986,7 @@ function setTool(t) {
   $('campBox').hidden = t !== 'camp'; $('walkBox').hidden = t !== 'walk';
   if (typeof walkPlane !== 'undefined') { walkPlane.visible = t === 'walk' || t === 'camp'; if (walkPlane.visible) refreshWalk(); }
   if (t !== 'sel') select(null);
+  if (t !== 'paint' && typeof picking !== 'undefined' && picking) setPicking(false);
 }
 $('tCamp').onclick = () => setTool('camp'); $('tWalk').onclick = () => setTool('walk');
 $('tSel').onclick = () => setTool('sel'); $('tPaint').onclick = () => setTool('paint'); $('tTrees').onclick = () => setTool('trees');
@@ -873,12 +1016,16 @@ $('cv').addEventListener('pointerdown', async e => {
     for (const h of ray.intersectObjects(root.children, true)) { let n = h.object; while (n.parent !== root) n = n.parent; const o = objs.find(o => o.node === n); if (o && !under.includes(o)) under.push(o); }
     // a flame is drawn over everything: when the ray crosses one, it is the first pick
     under.sort((a, b) => (b.it.m === 'flame') - (a.it.m === 'flame'));
+    if (under.length && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+      const cur = members(), spots = sel && sel.group ? sel.spots : [];
+      selectMany(e.shiftKey ? [...cur, under[0]] : cur.filter(o => o !== under[0]), spots); return;
+    }
     if (under.length) {
       const again = pickCycle && Math.hypot(e.clientX - pickCycle.x, e.clientY - pickCycle.y) < 6 && under.includes(sel);
       const o = again ? under[(under.findIndex(u => u === sel) + 1) % under.length] : under[0];
       pickCycle = { x: e.clientX, y: e.clientY }; select(o);
       if (under.length > 1) toast(`${o.it.m === 'flame' ? 'Camp fire flame' : M[o.it.m]?.name || M[o.it.m]?.label || o.it.m} (${under.indexOf(o) + 1}/${under.length}): click again for the one below`);
-    } else if (!tc.axis) select(null);
+    } else if (!tc.axis) { boxSel = { x: e.clientX, y: e.clientY, add: e.shiftKey }; $('cv').setPointerCapture(e.pointerId); }
     return;
   }
   if (tool === 'camp') {
@@ -894,6 +1041,7 @@ $('cv').addEventListener('pointerdown', async e => {
     if (spotPick) { const old = S.spots[spotPick]; S.spots[spotPick] = { p: [+h.point.x.toFixed(2), +h.point.z.toFixed(2)], f: +$('spotFace').value, ...(old && old.bam ? { bam: old.bam } : {}) }; drawCamp(); changed(); }
     return;
   }
+  if (tool === 'paint' && picking) { const h = hit(e, [groundNow()]); if (h) pickGround(h.point); return; }
   stroke = { last: null }; $('cv').setPointerCapture(e.pointerId); strokeAt(e);
 });
 $('cv').addEventListener('pointermove', e => {
@@ -910,6 +1058,27 @@ $('cv').addEventListener('pointerup', () => {
   drawCamp();
 });
 $('cv').addEventListener('pointermove', e => { if (stroke) strokeAt(e); moveBrushRing(e); });
+// Select: a box dragged from empty ground picks every piece and camp spot whose foot is inside it
+let boxSel = null;
+function boxRect(e) { return { l: Math.min(boxSel.x, e.clientX), t: Math.min(boxSel.y, e.clientY), r: Math.max(boxSel.x, e.clientX), b: Math.max(boxSel.y, e.clientY) }; }
+$('cv').addEventListener('pointermove', e => {
+  if (!boxSel) return;
+  const r = boxRect(e), c = $('cv').getBoundingClientRect(), el = $('boxSel');
+  el.hidden = r.r - r.l < 4 && r.b - r.t < 4;
+  Object.assign(el.style, { left: r.l - c.left + 'px', top: r.t - c.top + 'px', width: r.r - r.l + 'px', height: r.b - r.t + 'px' });
+});
+$('cv').addEventListener('pointerup', e => {
+  if (!boxSel) return;
+  const r = boxRect(e), add = boxSel.add; boxSel = null; $('boxSel').hidden = true;
+  if (r.r - r.l < 4 && r.b - r.t < 4) { if (!add) select(null); return; }
+  const c = $('cv').getBoundingClientRect();
+  const inside = v => { v.project(cam); const x = c.left + (v.x + 1) / 2 * c.width, y = c.top + (1 - v.y) / 2 * c.height; return v.z < 1 && x >= r.l && x <= r.r && y >= r.t && y <= r.b; };
+  const list = objs.filter(o => inside(o.node.position.clone()));
+  // (the camp fire's spot follows its flame: it is not picked on its own)
+  const spots = SPOTS.map(([k]) => k).filter(k => S.spots[k] && !(k === 'FIRE' && spotset === 'camp') && inside(new THREE.Vector3(S.spots[k].p[0], 0, S.spots[k].p[1])));
+  if (add) selectMany([...members(), ...list], [...(sel && sel.group ? sel.spots : []), ...spots]); else selectMany(list, spots);
+  if (sel && sel.group) toast(`${sel.objs.length + sel.spots.length} selected: move, turn, scale, colour, duplicate or delete them together`);
+});
 // brush preview: a ring on the ground under the cursor, the size of the current brush (ground paint, trees, walkable)
 const brushRing = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9, depthTest: false }));
 brushRing.rotation.x = -Math.PI / 2; brushRing.renderOrder = 12; brushRing.visible = false; scene.add(brushRing);
@@ -1216,7 +1385,7 @@ async function saveGround() {
   const todo = [...dirtyLayers]; dirtyLayers.clear();
   try {
     for (const i of todo) await db.doc(`maps/${mapId}_g${i}`).set({ layer: GROUNDS[i].id, mask: masks[i].toDataURL('image/webp', 0.92), size: MASK, updated: new Date().toISOString() });
-    await groundDoc.set({ layers: GROUNDS.map(g => g.id), tex_m: TEX_M, tex_m_by: Object.fromEntries(GROUNDS.map((g, i) => [g.id, +texM(i).toFixed(3)])), split: true, mask_size: MASK, adj: Object.fromEntries(GROUNDS.map((g, i) => [g.id, adj[i]]).filter(([, a]) => a.h || a.s !== 1 || a.b !== 1 || a.c !== 1)), updated: new Date().toISOString() });
+    await groundDoc.set({ layers: GROUNDS.map(g => g.id), names: Object.fromEntries(GROUNDS.slice(BASE_N).map(g => [g.id, g.name])), tex_m: TEX_M, tex_m_by: Object.fromEntries(GROUNDS.map((g, i) => [g.id, +texM(i).toFixed(3)])), split: true, mask_size: MASK, adj: Object.fromEntries(GROUNDS.map((g, i) => [g.id, adj[i]]).filter(([, a]) => a.h || a.s !== 1 || a.b !== 1 || a.c !== 1)), updated: new Date().toISOString() });
     status('Saved', 'ok');
   } catch (e) {
     todo.forEach(i => dirtyLayers.add(i)); maskDirty = true;
@@ -1283,8 +1452,14 @@ async function openMap(id) {
   PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
   if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
   $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m';
-  layerUsed = GROUNDS.map((g, i) => i === 0);
-  adj = GROUNDS.map(g => ({ ...ADJ0, ...((gsnap.exists && gsnap.data().adj) || {})[g.id] }));
+  dropVariants(); layerUsed = GROUNDS.map((g, i) => i === 0);
+  const gd = gsnap.exists ? gsnap.data() : {};
+  for (const lid of gd.layers || []) if (lid.includes('~') && GROUNDS.some(g => g.id === baseId(lid)) && !GROUNDS.some(g => g.id === lid)) {
+    const b = GROUNDS.find(g => g.id === baseId(lid)), n = lid.split('~')[1];
+    addLayer({ id: lid, name: (gd.names || {})[lid] || `${b.name} ${n}`, ...(b.px ? { px: b.px } : {}) });
+  }
+  if (layer >= GROUNDS.length) layer = 4;
+  adj = GROUNDS.map(g => ({ ...ADJ0, ...(gd.adj || {})[g.id] }));
   setMapSize(tiles); showAdj();
   S.items = (d.items || []).filter(i => M[i.m]); setTime(d.time ?? 14);
   S.spots = d.spots || {}; S.exits = d.exits || [];
@@ -1302,13 +1477,17 @@ async function openMap(id) {
   if (gsnap.exists) {
     const g = gsnap.data();
     // split layers (current) or the older single document with every mask
-    const urls = g.split ? await Promise.all(GROUNDS.map(async (x, i) => { const d = await db.doc(`maps/${id}_g${i}`).get(); return d.exists ? d.data().mask : null; })) : (g.masks || []);
+    // each layer's mask document by the layer's place in the saved list (a layer added since moves the others)
+    const saved = g.layers || GROUNDS.map(x => x.id), at = GROUNDS.map(x => saved.indexOf(x.id));
+    const urls = g.split ? await Promise.all(at.map(async j => { if (j < 0) return null; const d = await db.doc(`maps/${id}_g${j}`).get(); return d.exists ? d.data().mask : null; }))
+      : at.map(j => j < 0 ? null : (g.masks || [])[j]);
+    var moved = at.some((j, i) => j !== i && j >= 0);
     layerUsed = GROUNDS.map((g, i) => i === 0 || !!urls[i]);
     await Promise.all(urls.map(async (u, i) => { if (!masks[i] || !u) return; const im = await loadImg(u); const c = masks[i].getContext('2d'); c.clearRect(0, 0, MASK[0], MASK[1]); c.drawImage(im, 0, 0, MASK[0], MASK[1]); }));
     compose(0, 0, GROUND_PX[0], GROUND_PX[1]);
     if (!g.split) markAllLayers();   // move an old map to the split layout at the next save
   }
-  dirtyLayers.clear(); if (gsnap.exists && !gsnap.data().split) markAllLayers(); else maskDirty = false;
+  dirtyLayers.clear(); if (gsnap.exists && (!gsnap.data().split || moved)) markAllLayers(); else maskDirty = false;
   fillMapSel();
 }
 const PRESETS = { small: [30, 22], medium: [40, 30], large: [60, 45], huge: [80, 60] };
