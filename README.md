@@ -12,6 +12,10 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 > The tool comes with models and textures from the community, plus a few AI-generated items that are not always
 > polished or sorted. If you want to contribute models or textures, you are very welcome: see
 > [CONTRIBUTING.md](CONTRIBUTING.md).
+>
+> A note on the model library: some props clearly lack polish. I haven't had the time to do better yet, so any help is
+> very welcome, whether it's a better model, a texture, or a fix to an existing piece (an issue with a link and its
+> licence is enough).
 
 **Talk to me:** [GitHub Issues](https://github.com/sad0/MapSmithEE/issues) (bugs, suggestions, new models) ·
 [Discussions](https://github.com/sad0/MapSmithEE/discussions) (ideas, questions, your maps) ·
