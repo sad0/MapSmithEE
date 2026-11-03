@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.1.0 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.0 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,7 +21,7 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.1.0_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.0_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders.
@@ -202,7 +202,11 @@ Click **Render area…**.
    uses: the game knows areas only by this name.
 3. **Night version too**: renders the night picture as well.
 4. **Quality**: *Draft* is fast, for checking; *Good* for playing; *Final* for a release.
-5. **Render**. The bar shows the steps: loading models, the day and night pictures, then the area build. Blender works
+5. **HD tiles**: *None* for the game as it is. *2x* or *4x* also renders the pictures at that many times the game's
+   resolution and writes HD tiles in an `HD2X` / `HD4X` folder, for [IEX](https://github.com/sad0/IEX), which draws
+   them when you zoom in (put them in override instead of the normal TIS and PVRZ). The area itself stays the same.
+   A 2x render takes about 3 times longer, a 4x one about 6 times.
+6. **Render**. The bar shows the steps: loading models, the day and night pictures, then the area build. Blender works
    in the background; **Stop** cancels.
 
 The first render prepares every model and keeps them in a cache, so it is the slowest one (around 15–20 minutes for the

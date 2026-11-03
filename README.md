@@ -6,7 +6,7 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 
 ![The Camp example in MapSmithEE's BG camera view](docs/img/bg-view.jpg)
 
-> **Early preview (0.1.0).** This is a very early version: the tool was made in about one day, the example camp
+> **Early preview (0.2.0).** This is a very early version: the tool was made in about one day, the example camp
 > included. It is rough around the edges, but it can evolve quickly, and I am very open to feedback and suggestions.
 >
 > The tool comes with models and textures from the community, plus a few AI-generated items that are not always
@@ -34,7 +34,11 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
   painted by hand), camp-fire animations.
 - **Walls** that hide characters behind tents and trees, traced at the render, editable by hand, rebuilt in a second.
 - **Day and night** lighting, in the editor and in the render.
-- **Render area…** renders the map in Blender (day and night) and builds the playable area in one click.
+- **Render area…** renders the map in Blender (day and night) and builds the playable area in one click, optionally
+  with **HD tiles** (2x or 4x) for [IEX](https://github.com/sad0/IEX), which draws them when zoomed in.
+- **Your own pieces:** import 3D models in any format Blender reads, 2D sprites (transparent PNG or BAM frames) and
+  seamless ground textures.
+- **Export scene…** saves the scene for Blender (.blend, ready to render) or other 3D programs (.glb, .fbx).
 - Undo / redo for everything, automatic saving.
 - Ships with an example map, **Camp**.
 
@@ -42,7 +46,7 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 
 ## Install
 
-1. Download `MapSmithEE_0.1.0_x64-setup.exe` from the [latest release](https://github.com/sad0/MapSmithEE/releases)
+1. Download `MapSmithEE_0.2.0_x64-setup.exe` from the [latest release](https://github.com/sad0/MapSmithEE/releases)
    and run it (Windows 10/11). Windows may warn that the app is not signed: *More info → Run anyway*.
 2. To render areas, install [Blender](https://www.blender.org/download/) 5.x. MapSmithEE finds it by itself.
 3. The first time you render, MapSmithEE downloads the full-quality models (about 2.6 GB, once).
