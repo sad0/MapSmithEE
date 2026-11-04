@@ -42,6 +42,7 @@
   </div>`;
   document.body.appendChild(box);
   const $ = id => document.getElementById(id);
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
   let busy = false, libOk = false, blOk = false, lastOut = '';
   const setBar = (pct, step) => { $('rdBar').style.display = 'block'; $('rdBar').firstChild.style.width = Math.max(0, Math.min(100, pct)) + '%'; $('rdStep').textContent = step || ''; };
@@ -73,10 +74,19 @@
       $('rdDl').hidden = s.ready;
     } catch (e) { $('rdLib').textContent = 'Model library: ' + e; }
     try {
-      const b = await invoke('camprender_find_blender');
+      const r = await invoke('blender_get'), b = r.path;
       blOk = !!b;
-      $('rdBl').innerHTML = b ? `Blender: ${b}` : 'Blender 5.x is needed: install it from <a href="https://www.blender.org/download/" target="_blank" style="color:var(--accent)">blender.org</a>, then reopen this window.';
+      $('rdBl').innerHTML = (b ? `Blender: ${esc(b)}` : r.manual ? `Blender: ${esc(r.set)} is missing.` : 'Blender 5.x is needed: install it from <a href="https://www.blender.org/download/" target="_blank" style="color:var(--accent)">blender.org</a>, or pick a portable one.')
+        + ` <a href="#" id="rdBlPick" style="color:var(--accent)">Choose…</a>` + (r.manual ? ` <a href="#" id="rdBlAuto" style="color:var(--accent)">Automatic</a>` : '');
       $('rdBl').className = 'note' + (b ? '' : ' bad');
+      $('rdBlPick').onclick = async e => {
+        e.preventDefault();
+        const p = await invoke('plugin:dialog|open', { options: { multiple: false, directory: false, title: 'Blender', filters: /Win/.test(navigator.userAgent) ? [{ name: 'blender.exe', extensions: ['exe'] }] : [] } }).catch(() => null);
+        if (!p) return;
+        try { await invoke('blender_set', { path: typeof p === 'string' ? p : p.path || String(p) }); } catch (err) { $('rdStep').textContent = String(err); }
+        check();
+      };
+      if (r.manual) $('rdBlAuto').onclick = async e => { e.preventDefault(); await invoke('blender_set', { path: '' }).catch(() => {}); check(); };
     } catch (e) { blOk = false; $('rdBl').textContent = 'Blender: ' + e; }
     refreshGo();
   }

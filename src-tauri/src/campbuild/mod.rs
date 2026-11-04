@@ -163,9 +163,6 @@ impl Area {
     }
 }
 
-fn sin_e() -> f64 {
-    (ELEV_DEG * PI / 180.0).sin()
-}
 
 fn num(v: &Value) -> f64 {
     v.as_f64().unwrap_or(0.0)
@@ -310,7 +307,9 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         Some(v) if v != 60.0 => v,
         _ => PXM_DEFAULT,
     };
-    let se = sin_e();
+    // the camera's angle down (Map panel > Camera angle); BG's own areas are 38 degrees
+    let elev = doc.get("elev").and_then(|v| v.as_f64()).filter(|v| (20.0..=70.0).contains(v)).unwrap_or(ELEV_DEG) * PI / 180.0;
+    let se = elev.sin();
     let size_m = doc.get("size_m").and_then(|v| v.as_array()).ok_or("map: no size_m")?;
     let (sw, sh) = (num(&size_m[0]), num(size_m.get(1).unwrap_or(&Value::Null)));
     let tw = (sw * pxm / 64.0).round_ties_even() as usize;
@@ -480,7 +479,7 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         _ => None,
     };
     let (cw, ch) = (mw / 16, mh / 12);
-    let search = search_map(&its, &models, pxm, cw, ch, fix.as_deref(), &exits)?;
+    let search = search_map(&its, &models, pxm, se, cw, ch, fix.as_deref(), &exits)?;
     report.blocked_cells = search.iter().filter(|&&v| v == BLOCK).count();
     let tpl_pal = |file: &str, fallback: &[u8]| -> Vec<u8> {
         sado.as_ref()
@@ -537,7 +536,7 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         let Some(m) = models.get(it.m) else { continue };
         let Some(&(label, bam, share)) = FLAME_BAM.iter().find(|f| f.0 == m.label) else { continue };
         let (x, y) = px(it.p[0], it.p[2]);
-        let top = m.dims[2] * it.s * share * (ELEV_DEG * PI / 180.0).cos() * pxm;
+        let top = m.dims[2] * it.s * share * elev.cos() * pxm;
         lights += 1;
         flames.push((format!("{}_{lights}", title(label)), bam.into(), x, (y as f64 - top).trunc() as i32));
     }
@@ -640,12 +639,13 @@ fn search_map(
     its: &[Item],
     models: &HashMap<String, Model>,
     pxm: f64,
+    se: f64,
     cw: usize,
     ch: usize,
     fix: Option<&str>,
     exits: &[Vec<Pt>],
 ) -> Result<Vec<u8>, String> {
-    let cell = (16.0 / pxm, 12.0 / (pxm * sin_e()));
+    let cell = (16.0 / pxm, 12.0 / (pxm * se));
     let mut img = vec![0u8; cw * ch];
     let mut g = raster::Grid { px: &mut img, w: cw as i64, h: ch as i64 };
     for it in its {

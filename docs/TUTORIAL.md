@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.0 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.1 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,10 +21,10 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.0_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.1_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
-   install folders.
+   install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
 3. Start MapSmithEE. It opens on **Camp**, the example map.
 
 Your maps are saved automatically in the app's data folder. Rendered areas go to `Documents\MapSmithEE\<area name>`.
@@ -36,7 +36,7 @@ Your maps are saved automatically in the app's data folder. Rendered areas go to
 The screen has three parts: the **model palette** on the left, the **map** in the middle, the **settings** of the current
 tool on the right. The top bar holds the view, the tools, the light, the map list, undo / redo and **Render area…**.
 
-- **BG camera** shows the map exactly as the game will: the same 38° angle, the same scale. The small blue, green and
+- **BG camera** shows the map exactly as the game will: the same angle (38°, like BG's own areas), the same scale. The small blue, green and
   brown people are real-size game characters (*Show BG people* in the Map panel turns them on and off).
 - **Mouse:** wheel = zoom (towards the cursor), middle drag = pan, left drag = the current tool.
 
@@ -44,6 +44,8 @@ tool on the right. The top bar holds the view, the tools, the light, the map lis
 
 - **Free** is a free 3D camera: right drag = orbit, middle drag = pan, wheel = zoom. Handy to check heights and hidden
   pieces. The render always uses the BG camera.
+- **Fast view**, for big maps or slower PCs: no live shadows, fire lights or fire animation, a lower resolution, and the
+  view redraws only while you work. It changes nothing in the render.
 
 ## 3. Maps
 
@@ -51,8 +53,9 @@ tool on the right. The top bar holds the view, the tools, the light, the map lis
 - **New map** asks for a name and a size in tiles (64×64 game pixels each): small 30×22, medium 40×30, large 60×45,
   huge 80×60. The ground starts as grass.
 - **Resize** changes the size of the current map; tick the sides that grow (or shrink).
-- **Change game scale…** (bottom of the Map panel) sets how many game pixels a metre is. Leave it at 42 px/m unless you
-  know why: it changes the size of everything next to the game's characters.
+- **Game scale & camera…** (bottom of the Map panel) sets how many game pixels a metre is, and the camera's angle. Leave
+  them at 42 px/m and 38° unless you know why: 42 px/m makes BG's 72 px human about 1.7 m tall, and 38° is BG's own
+  angle. The scale changes the size of everything next to the game's characters.
 
 ## 4. Place models
 
@@ -278,7 +281,9 @@ a script or dialogue that uses `LeaveAreaLUA`).
 
 ## 16. Troubleshooting
 
-- **"Blender 5.x is needed"**: install Blender 5.x from blender.org, then reopen the Render dialog.
+- **"Blender 5.x is needed"**: install Blender 5.x from blender.org, then reopen the Render dialog. Already installed
+  somewhere else, or portable: **Choose…** next to it and pick its `blender.exe` (**Automatic** goes back to searching).
+- **The editor is slow on a big map**: turn on **Fast view** (top bar).
 - **The model download stopped**: click **Download models** again; it resumes where it stopped.
 - **The render is slow**: the first one fills the model cache; try *Draft* while you work on the layout.
 - **Characters walk through things / get stuck**: check **Walkable** and paint the corrections.

@@ -614,6 +614,30 @@ fn blender_of(app: &tauri::AppHandle) -> Res<PathBuf> {
     b.filter(|p| p.is_file()).ok_or_else(|| "Blender not found: set its path in the settings".into())
 }
 
+/// the Blender renders use: the one picked in the Render dialog, else the newest found in the usual places
+#[tauri::command]
+fn blender_get(app: tauri::AppHandle) -> serde_json::Value {
+    let s = load_settings(&app);
+    let manual = !s.blender_exe.is_empty();
+    let path = blender_of(&app).ok().map(|p| p.to_string_lossy().into_owned());
+    serde_json::json!({ "path": path, "manual": manual, "set": s.blender_exe })
+}
+
+/// picks blender.exe by hand (a portable Blender, another drive); empty = back to automatic
+#[tauri::command]
+fn blender_set(app: tauri::AppHandle, path: String) -> Res<()> {
+    let p = PathBuf::from(&path);
+    if !path.is_empty() {
+        let name = p.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if !p.is_file() || !name.starts_with("blender") {
+            return Err(format!("{path} is not blender.exe"));
+        }
+    }
+    let mut s = load_settings(&app);
+    s.blender_exe = path;
+    settings_set(app, s)
+}
+
 /// the editor's start: the user's pieces (editor entries) and ground textures
 #[tauri::command]
 fn userlib_list(app: tauri::AppHandle) -> Res<serde_json::Value> {
@@ -791,6 +815,8 @@ pub fn run() {
             camp3d::camp3d_delete,
             campbuild_run,
             camprender::camprender_find_blender,
+            blender_get,
+            blender_set,
             camprender::camprender_run,
             camprender::camprender_cancel,
             camp3d_render_area,

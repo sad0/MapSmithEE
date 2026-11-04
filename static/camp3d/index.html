@@ -56,7 +56,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
 
 <header>
   <h1>Camp Map 3D</h1>
-  <div class="grp"><span class="lbl">View</span><button id="vBG" class="on" title="The game's camera">BG camera</button><button id="vFree" title="Orbit freely">Free</button></div>
+  <div class="grp"><span class="lbl">View</span><button id="vBG" class="on" title="The game's camera">BG camera</button><button id="vFree" title="Orbit freely">Free</button><button id="vFast" title="For big maps or slower PCs: no live shadows, fire lights or fire animation, lower resolution, and the view redraws only while you work. The render is not affected">Fast view</button></div>
   <div class="grp"><span class="lbl">Tool</span><button id="tSel" class="on">Select (Q)</button><button id="tPaint">Paint ground</button><button id="tTrees">Tree brush</button><button id="tCamp" title="Where the camp people stand, the arrival point, the exits">Camp spots</button><button id="tWalk" title="Where the party can walk (the game's search map)">Walkable</button><button id="tWallT" title="What hides the characters standing behind a piece in the game">Walls</button></div>
   <div class="grp"><span class="lbl">Light</span><button id="tDay" class="on" title="BG's sun: south-west, 45°, shadows up-right">Day</button><button id="tNight" title="Moonlight; fires, braziers, lanterns and torches lit">Night</button></div>
   <div class="grp"><span class="lbl">Map</span><select id="mapSel"></select><button id="mapNew">New map</button><button id="mapResize">Resize</button></div>
@@ -184,12 +184,13 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
   <div class="row"><label><input id="people" type="checkbox"> Show BG people</label></div>
   <div class="hint">At their real size in the game: an NPC on each camp spot, a party (human, elf, dwarf, halfling) at the arrival point.</div>
   <div class="hint" id="mapInfo"></div>
-  <div class="row"><button id="pxmOpen" title="Rarely needed: changes the size of everything next to the game's characters">Change game scale…</button></div>
+  <div class="row"><button id="pxmOpen" title="Rarely needed: changes the size of everything next to the game's characters, or the camera's angle">Game scale &amp; camera…</button></div>
   <div id="pxmBox" hidden>
     <div class="hint bad">Changes the size of every object next to the game's characters and the map's tile count. Rarely needed.</div>
     <div class="row"><label>Game scale</label><input id="pxm" type="range" min="24" max="64" step="1" value="42" style="flex:1"><span id="pxmL" class="lbl">42 px/m</span></div>
+    <div class="row"><label>Camera angle</label><input id="elev" type="range" min="30" max="60" step="1" value="38" style="flex:1"><span id="elevL" class="lbl">38°</span></div>
     <div class="row"><button id="pxmApply" hidden>Apply</button><button id="pxmClose">Cancel</button></div>
-    <div class="hint">Fewer px/m = smaller objects next to the game's characters. The map keeps its size in metres; its tile count follows.</div>
+    <div class="hint">Fewer px/m = smaller objects next to the game's characters. Camera angle: how far down the camera looks (BG's own areas: 38°). The map keeps its size in metres; its tile count follows.</div>
   </div>
   <div class="hint">Controls: left drag = tool · wheel = zoom · middle drag = pan · Free view: right drag = orbit.</div>
 </aside>
@@ -233,7 +234,7 @@ addEventListener('unhandledrejection', e => { const s = $('status'); if (s) { s.
 // pixels per metre in the game, per map (Map panel > Game scale). BG's characters are fixed-size sprites, so this sets
 // how big every object looks next to them; the reference people (Show BG people) are drawn at their real pixel size
 const PXM_DEFAULT = 42; let PXM = PXM_DEFAULT;
-const ELEV = 38 * Math.PI / 180;
+const ELEV_DEFAULT = 38; let ELEV_DEG = ELEV_DEFAULT, ELEV = ELEV_DEG * Math.PI / 180;
 // map size in BG tiles (64 px); everything metric follows from it (setMapSize)
 let TILES = [40, 30], MAP_PX, W, D, MASK, GROUND_PX, PXM_G;
 function sizesFor(t) {
@@ -416,7 +417,7 @@ function setMapSize(t, keep) {
   if (groundImgs.length) buildPatterns();
   compose(0, 0, GROUND_PX[0], GROUND_PX[1]); camBG.zoom = 1; placeBG();
   if (hist.length) histReset();   // ground steps hold mask pixels of the old size
-  $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera 38°`;
+  $('mapInfo').textContent = `${TILES[0]}×${TILES[1]} tiles · ${MAP_PX[0]}×${MAP_PX[1]} px · ${W.toFixed(1)} × ${D.toFixed(1)} m · ${PXM} px/m · camera ${ELEV_DEG}°`;
 }
 async function loadGround() {
   groundImgs = await Promise.all(GROUNDS.map(g => loadImg(texUrl(baseId(g.id)))));
@@ -574,20 +575,23 @@ $('aReset').onclick = () => { adjBefore = { i: layer, a: { ...adj[layer] } }; ad
 
 /* ---------- game scale, and BG's people at their real size ---------- */
 // the game scale hides behind a button: rarely changed, and a change resizes everything
-const pxmShut = () => { $('pxmBox').hidden = true; $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m'; $('pxmApply').hidden = true; };
+const pxmShow = () => { $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m'; $('elev').value = ELEV_DEG; $('elevL').textContent = ELEV_DEG + '°'; };
+const pxmShut = () => { $('pxmBox').hidden = true; pxmShow(); $('pxmApply').hidden = true; };
+const pxmDirty = () => { $('pxmApply').hidden = +$('pxm').value === PXM && +$('elev').value === ELEV_DEG; };
 $('pxmOpen').onclick = () => { if ($('pxmBox').hidden) $('pxmBox').hidden = false; else pxmShut(); };
 $('pxmClose').onclick = pxmShut;
-$('pxm').addEventListener('input', () => { $('pxmL').textContent = $('pxm').value + ' px/m'; $('pxmApply').hidden = +$('pxm').value === PXM; });
+$('pxm').addEventListener('input', () => { $('pxmL').textContent = $('pxm').value + ' px/m'; pxmDirty(); });
+$('elev').addEventListener('input', () => { $('elevL').textContent = $('elev').value + '°'; pxmDirty(); });
 // nothing changes until Apply: a stray drag of the slider once rebuilt a whole map
 $('pxmApply').onclick = () => {
-  const p = +$('pxm').value; $('pxmApply').hidden = true; $('pxmBox').hidden = true; if (p === PXM) return;
-  // the ground keeps its size in metres: the tile count follows the new scale
-  PXM = p; const t = [Math.max(10, Math.round(W * PXM / 64)), Math.max(8, Math.round(D * PXM * Math.sin(ELEV) / 64))];
+  const p = +$('pxm').value, e = +$('elev').value; $('pxmApply').hidden = true; $('pxmBox').hidden = true; if (p === PXM && e === ELEV_DEG) return;
+  // the ground keeps its size in metres: the tile count follows the new scale and angle
+  PXM = p; ELEV_DEG = e; ELEV = e * Math.PI / 180; const t = [Math.max(10, Math.round(W * PXM / 64)), Math.max(8, Math.round(D * PXM * Math.sin(ELEV) / 64))];
   setMapSize(t, { ox: 0, oz: 0 });
   const info = maps.find(m => m.id === mapId); if (info) info.tiles = t; fillMapSel(); saveIndex();
   if (walkPlane.visible) refreshWalk(); walkDirty = true; changedWalk();
   drawPeople(); for (const o of objs) applyScale(o.node, o.it); markAllLayers(); changed(); changedGround();
-  toast(`${PXM} px/m: map now ${t[0]}×${t[1]} tiles`);
+  placeBG(); toast(`${PXM} px/m, camera ${ELEV_DEG}°: map now ${t[0]}×${t[1]} tiles`);
 };
 // sprite height in game pixels (feet to top of the head) and body width next to a human's
 const PEOPLE = { human: { px: 72, w: 1, col: '#3d5a8c' }, female: { px: 68, w: 0.92, col: '#7a3d5a' }, elf: { px: 68, w: 0.88, col: '#3d7a4a' },
@@ -1497,7 +1501,7 @@ const SUN_DIR = new THREE.Vector3(-0.61, 0, 0.79).normalize().multiplyScalar(Mat
 const FIRES = { campfire: [0.4, 18, 14], brazier: [0.9, 9, 10], forge: [0.8, 9, 10], torch: [0.85, 5, 7], lantern: [0.7, 3, 5], 'lamp post': [0.9, 4, 8] };
 const fireGroup = new THREE.Group(); scene.add(fireGroup);
 function refreshFires(night) {
-  fireGroup.clear(); const k = night ? 1 : 0.12;
+  fireGroup.clear(); if (FAST) return; const k = night ? 1 : 0.12;
   for (const o of objs.slice()) {
     const m = M[o.it.m], f = m && FIRES[m.label]; if (!f || fireGroup.children.length >= 16) continue;
     const s = o.it.s || 1, l = new THREE.PointLight(0xff9a4a, f[1] * k, f[2] * s, 2);
@@ -1596,7 +1600,7 @@ function changed() {
 }
 async function save() {
   if (saving || !dirty) return; saving = true; dirty = false; status('Saving…');
-  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: 38, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
+  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: ELEV_DEG, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
   catch (e) { status(e && e.code === 'permission_denied' ? 'View only: changes are not kept' : 'Save failed, will retry', 'warn'); if (e && e.code === 'permission_denied') canWrite = false; }
   saving = false; if (dirty) save();
 }
@@ -1675,7 +1679,8 @@ async function openMap(id) {
   // each map keeps its own scale; the first maps were made at 60 px/m and move to the default, keeping their size in metres
   PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
   if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
-  $('pxm').value = PXM; $('pxmL').textContent = PXM + ' px/m';
+  ELEV_DEG = d.elev >= 30 && d.elev <= 60 ? d.elev : ELEV_DEFAULT; ELEV = ELEV_DEG * Math.PI / 180;
+  pxmShow();
   dropVariants(); layerUsed = GROUNDS.map((g, i) => i === 0);
   const gd = gsnap.exists ? gsnap.data() : {};
   for (const lid of gd.layers || []) if (lid.includes('~') && GROUNDS.some(g => g.id === baseId(lid)) && !GROUNDS.some(g => g.id === lid)) {
@@ -1749,15 +1754,26 @@ $('mpOk').onclick = async () => {
 };
 
 /* ---------- loop ---------- */
+/* Fast view: the live effects off (shadows, fire lights and animation), 1 px per screen pixel, and an idle view drawn
+   4 times a second instead of every frame (any input or change draws at full rate again) */
+let FAST = false; try { FAST = localStorage.getItem('map3d.fast') === '1'; } catch {}
+let lastInput = 0, lastDraw = 0;
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) addEventListener(ev, () => { lastInput = performance.now(); }, { capture: true, passive: true });
+function setFast(on) {
+  FAST = on; try { localStorage.setItem('map3d.fast', on ? '1' : '0'); } catch {}
+  $('vFast').classList.toggle('on', on); sun.castShadow = !on; setTime(S.time); resize(); lastInput = performance.now();
+}
+$('vFast').onclick = () => setFast(!FAST);
 function resize() {
-  const el = $('cv'), w = el.clientWidth, h = el.clientHeight; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(w, h, false);
+  const el = $('cv'), w = el.clientWidth, h = el.clientHeight; renderer.setPixelRatio(FAST ? 1 : Math.min(2, devicePixelRatio || 1)); renderer.setSize(w, h, false);
   camFree.aspect = w / Math.max(1, h); camFree.updateProjectionMatrix(); fitBG();
 }
 addEventListener('resize', resize);
 function loop() {
   requestAnimationFrame(loop); if (orbit.enabled) orbit.update();
+  const now = performance.now(); if (FAST && now - lastInput > 500 && now - lastDraw < 250) return; lastDraw = now;
   for (const o of objs) if (o.sprite) o.sprite.quaternion.copy(o.node.quaternion).invert();
-  const fi = Math.floor(performance.now() / 66); for (const k in fireTex) fireTex[k].offset.x = (fi % FIRE_BAMS[k].frames) / FIRE_BAMS[k].frames;
+  const fi = FAST ? 0 : Math.floor(now / 66); for (const k in fireTex) fireTex[k].offset.x = (fi % FIRE_BAMS[k].frames) / FIRE_BAMS[k].frames;
   renderer.render(scene, cam); placeGizmo();
 }
 async function boot() {
@@ -1773,7 +1789,7 @@ async function boot() {
     BASE_N = GROUNDS.length;
   } catch (e) { console.warn('userlib', e); }
   M.flame = { label: 'flame', name: 'Camp fire flame (game animation)', group: 'camp', dims: [1.9, 1.9, 1.6], notray: 1 };
-  placeBG(); resize(); setTime(14); buildTray(); buildTreeKinds(); setTool('sel'); loop();
+  placeBG(); setFast(FAST); setTime(14); buildTray(); buildTreeKinds(); setTool('sel'); loop();
   await loadGround().catch(() => status('Ground textures missing', 'warn'));
   setMapSize(TILES); fillMapSel();
   status('Local only', 'warn'); connect();
