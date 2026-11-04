@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.2 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.3 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,7 +21,7 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.2_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.3_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
@@ -241,7 +241,7 @@ The result is in `Documents\MapSmithEE\AR9900`:
 | `AR9900N.TIS` + `A9900N00.PVRZ`... | the night picture |
 | `AR9900.WED`, `AR9900N.WED` | the walls (what hides characters behind trees and tents) |
 | `AR9900SR.BMP` | search map (walkable cells) |
-| `AR9900HT.BMP`, `AR9900LM.BMP`, `AR9900LN.BMP` | height map, day and night light maps |
+| `AR9900HT.BMP`, `AR9900LM.BMP`, `AR9900LN.BMP` | height map; day and night light maps, measured on the render: the characters darken in the shadows cast on the ground and take the fires' glow by night, like in BG's own areas |
 | `preview.jpg` | the render with walls (cyan), blocked cells (red), exits and spots drawn on it |
 | `HOW_TO_TEST.txt` | how to try the area in the game, with its console line |
 

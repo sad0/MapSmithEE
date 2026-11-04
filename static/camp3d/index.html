@@ -286,7 +286,7 @@ const renderer = new THREE.WebGLRenderer({ canvas: $('cv'), antialias: true });
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;   // PCF honours shadow.radius: soft edges like BG's
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0e0c09);
-const hemi = new THREE.HemisphereLight(0xb8c6d8, 0x4a3f2c, 0.55); scene.add(hemi);
+const hemi = new THREE.HemisphereLight(0xb0d6fa, 0x587464, 1.5); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1d8, 1.6); sun.castShadow = true;
 // shadow frame fitted to the map and a tight depth range: with the old 1..200 range the bias shifted every shadow
 // ~10 cm off its object, so objects seemed to float and sank "before touching" the ground
@@ -1504,7 +1504,7 @@ const SUN_DIR = new THREE.Vector3(-0.61, 0, 0.79).normalize().multiplyScalar(Mat
 const FIRES = { campfire: [0.4, 18, 14], brazier: [0.9, 9, 10], forge: [0.8, 9, 10], torch: [0.85, 5, 7], lantern: [0.7, 3, 5], 'lamp post': [0.9, 4, 8] };
 const fireGroup = new THREE.Group(); scene.add(fireGroup);
 function refreshFires(night) {
-  fireGroup.clear(); if (FAST) return; const k = night ? 1 : 0.12;
+  fireGroup.clear(); if (FAST) return; const k = night ? 1.4 : 0.12;
   for (const o of objs.slice()) {
     const m = M[o.it.m], f = m && FIRES[m.label]; if (!f || fireGroup.children.length >= 16) continue;
     const s = o.it.s || 1, l = new THREE.PointLight(0xff9a4a, f[1] * k, f[2] * s, 2);
@@ -1519,8 +1519,11 @@ function setTime(h) {
   sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 80);
   const night = h < 6.5 || h > 20.5; refreshFires(night);
   for (const m of treeMats.sprite) m.color.copy(spriteTint());
-  sun.intensity = night ? 0.25 : 0.4 + day * 1.4; sun.color.set(night ? 0x8fa6d8 : day < 0.35 ? 0xffb070 : 0xfff1d8);
-  hemi.intensity = night ? 0.18 : 0.35 + day * 0.3; hemi.color.set(night ? 0x34406a : 0xb8c6d8);
+  // calibrated on the Blender render of the same map (Camp, 2026-11-04: mean colour within 1 % by day, 2-12 % by
+  // night): the preview models and textures are warmer than the render's, so the lights are white-balanced cooler.
+  // Before, the view was yellower than the game (szef, G3). The BG people are unlit: they keep their game colours
+  sun.intensity = night ? 0.06 : 0.4 + day * 1.04; sun.color.set(night ? 0xb0a8b0 : day < 0.35 ? 0xffb070 : 0xecfffc);
+  hemi.intensity = night ? 0.06 : 0.35 + day * 1.33; hemi.color.set(night ? 0x403c44 : 0xb0d6fa);
 }
 // day and night only: BG's daylight never moves, so the hour is just 14:00 or 22:00 (the export renders both)
 $('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () => { setTime(22); changed(); };

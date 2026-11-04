@@ -7,6 +7,7 @@
 
 mod contour;
 mod files;
+pub mod light;
 mod palettes;
 mod preview;
 pub mod pvrz;
@@ -110,6 +111,8 @@ pub struct BuildReport {
     pub walls: usize,
     pub blocked_cells: usize,
     pub flames: usize,
+    /// LM/LN computed from the render's light pass (false: flat, a render made before 0.2.3)
+    pub light_maps: bool,
     /// HD tiles folder (scale > 1), relative to out_dir
     pub hd_dir: Option<String>,
     /// set when the ENTRY spot stood in an exit and was moved out
@@ -492,19 +495,42 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         format!("{name}HT.BMP"),
         &files::bmp(&vec![8u8; cw * ch], cw, ch, 8, &tpl_pal("SQCAMPHT.BMP", &palettes::HT))?,
     )?;
-    write(
-        format!("{name}LM.BMP"),
-        &files::bmp(&vec![0u8; cw * ch], cw, ch, 8, &tpl_pal("SQCAMPLM.BMP", &palettes::LM))?,
-    )?;
+    // light maps from the render's light pass (light.rs); a render made before 0.2.3 has none: flat, as before.
+    // Measured on the ground only: the id pass's black (the night picture has the same pieces in the same places)
+    let ground: Option<Vec<bool>> = image::open(&id)
+        .ok()
+        .map(|im| im.to_rgb8())
+        .filter(|im| (im.width() as usize, im.height() as usize) == (mw, mh))
+        .map(|im| im.pixels().map(|p| p.0 == [0, 0, 0]).collect());
+    let light_map = |pic: &Path, f: fn(&[[f32; 3]]) -> Vec<[u8; 3]>| -> Result<Option<(Vec<u8>, Vec<u8>)>, String> {
+        let lp = sibling(pic, "_light");
+        if !lp.is_file() {
+            return Ok(None);
+        }
+        let img = image::open(&lp).map_err(|e| format!("{}: {e}", lp.display()))?.to_rgba8();
+        if (img.width() as usize, img.height() as usize) != (mw, mh) {
+            return Err(format!("{}: {}x{}, the map needs {mw}x{mh}", lp.display(), img.width(), img.height()));
+        }
+        let (c, _, _) = light::cells(img.as_raw(), ground.as_deref(), mw, mh);
+        Ok(Some(light::palettize(&f(&c))))
+    };
+    let lm = match light_map(&input.render, light::day)? {
+        Some((pal, idx)) => files::bmp(&idx, cw, ch, 8, &pal)?,
+        None => files::bmp(&vec![0u8; cw * ch], cw, ch, 8, &tpl_pal("SQCAMPLM.BMP", &palettes::LM))?,
+    };
+    report.light_maps = sibling(&input.render, "_light").is_file();
+    write(format!("{name}LM.BMP"), &lm)?;
     let ln_ok = match &sado {
         Some(t) => t.join("SQCAMPLN.BMP").exists(),
         None => true,
     };
     if input.night.is_some() && ln_ok {
-        write(
-            format!("{name}LN.BMP"),
-            &files::bmp(&vec![0u8; cw * ch], cw, ch, 8, &tpl_pal("SQCAMPLN.BMP", &palettes::LN))?,
-        )?;
+        let night_pic = input.night.as_deref().unwrap_or(Path::new(""));
+        let ln = match light_map(night_pic, light::night)? {
+            Some((pal, idx)) => files::bmp(&idx, cw, ch, 8, &pal)?,
+            None => files::bmp(&vec![0u8; cw * ch], cw, ch, 8, &tpl_pal("SQCAMPLN.BMP", &palettes::LN))?,
+        };
+        write(format!("{name}LN.BMP"), &ln)?;
     }
 
     progress(85, "Area");

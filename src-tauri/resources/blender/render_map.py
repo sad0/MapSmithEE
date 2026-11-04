@@ -300,14 +300,56 @@ if os.environ.get('MAPSMITH_EXPORT'):
     light(HOUR)
     exportscene.save(json.loads(os.environ['MAPSMITH_EXPORT']), sc, gnd, lib, list(_bgmesh), PXM)
     sys.exit(0)
+# ---------- light pass (area builds): the direct and indirect light every surface gets (no surface colour), saved by
+# the compositor during the picture's own render, then turned into <out>_light.png at the game's 1x size for the light
+# maps (LM by day, LN by night: campbuild::light). RGB = direct light, open ground in full sun (or moon) = LIGHT_REF, so
+# fires keep their colour up to 8 times brighter; A = 255 where a surface takes light at all (0 under BG sprite cards,
+# which are lit by their own emission) ----------
+LIGHT_REF = 32
+def light_setup(out):
+    vl = sc.view_layers[0]; on = bool(out)
+    vl.use_pass_diffuse_direct = vl.use_pass_diffuse_indirect = on; sc.render.use_compositing = on
+    if not on: return
+    ng = bpy.data.node_groups.new('mapsmith_light', 'CompositorNodeTree'); sc.compositing_node_group = ng
+    ng.interface.new_socket('Image', in_out='OUTPUT', socket_type='NodeSocketColor')
+    rl = ng.nodes.new('CompositorNodeRLayers'); go = ng.nodes.new('NodeGroupOutput'); ng.links.new(rl.outputs['Image'], go.inputs[0])
+    fo = ng.nodes.new('CompositorNodeOutputFile'); fo.directory = os.path.dirname(out); fo.file_name = os.path.basename(out)[:-4] + '_light_'
+    fo.format.media_type = 'IMAGE'; fo.format.file_format = 'OPEN_EXR'; fo.format.color_depth = '32'
+    for nm in ('Diffuse Direct', 'Diffuse Indirect'):
+        it = fo.file_output_items.new('RGBA', nm.replace(' ', '')); ng.links.new(rl.outputs[nm], fo.inputs[it.name])
+def light_write(out, night):
+    import numpy as np
+    passes = []
+    for nm in ('DiffuseDirect', 'DiffuseIndirect'):
+        f = out[:-4] + '_light_' + nm + '.exr'; im = bpy.data.images.load(f); w, h = im.size
+        a = np.empty(w * h * 4, np.float32); im.pixels.foreach_get(a); bpy.data.images.remove(im); os.remove(f)
+        a = a.reshape(h, w, 4)[::-1, :, :3]   # Blender's rows go bottom-up
+        if SCALE > 1: a = a.reshape(h // SCALE, SCALE, w // SCALE, SCALE, 3).mean((1, 3))
+        passes.append(a)
+    d, ind = passes; h, w = d.shape[:2]
+    lum = lambda x: x @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    # the reference: most of the lit pixels are flat ground in full sun; by night, in moonlight only (bluish: the fires'
+    # orange light would otherwise set it on a small map)
+    ld = lum(d); lit = ld[(ld > 1e-4) & ((d[..., 2] >= d[..., 0]) if night else True)]
+    ref = float(np.percentile(lit, 75)) if lit.size else 1.0
+    rgba = np.empty((h, w, 4), np.float32)
+    rgba[..., :3] = np.clip(d / max(ref, 1e-6) * LIGHT_REF, 0, 255).round() / 255
+    rgba[..., 3] = (ld + lum(ind)) > 1e-4
+    im = bpy.data.images.new('light', w, h, alpha=True); im.pixels.foreach_set(rgba[::-1].ravel())
+    im.filepath_raw = out[:-4] + '_light.png'; im.file_format = 'PNG'; im.save(); bpy.data.images.remove(im)
+    print('rendered light', out[:-4] + '_light.png', flush=True)
 for k, job in enumerate(JOBS):
     OUT = job['out']; light(float(job['hour']) if job.get('hour') is not None else HOUR)
     sc.render.resolution_percentage = 100 * SCALE
     print(f"MAPSMITH job {k + 1}/{len(JOBS)}", flush=True)
     sc.render.filepath = OUT
+    light_setup(OUT if job.get('light') else None)
     print('MAPSMITH stage render', flush=True)
     bpy.ops.render.render(write_still=True)
     print('rendered', OUT, flush=True)
+    if job.get('light'):
+        h_ = float(job['hour']) if job.get('hour') is not None else HOUR
+        light_write(OUT, h_ < 6.5 or h_ > 20.5); light_setup(None)
     if not job.get('id'): continue
     # 1) coverage: the pieces alone (ground hidden), transparent background; the alpha keeps leaf cards' real holes
     for d_ in decals: d_.hide_render = True

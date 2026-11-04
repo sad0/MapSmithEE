@@ -39,7 +39,8 @@ pub struct RenderRequest {
     /// `models/offsets` (the editor's Calibrate mode), if any
     #[serde(default)]
     pub offsets: Option<Value>,
-    /// output picture (.png); with `id_pass`, `<out>_alpha.png` and `<out>_id.png` are written next to it
+    /// output picture (.png); with `id_pass`, `<out>_alpha.png` and `<out>_id.png` are written next to it, and
+    /// `<out>_light.png` next to it and to each `also` picture (the light pass, campbuild::light)
     pub out_png: PathBuf,
     #[serde(default = "default_samples")]
     pub samples: u32,
@@ -503,8 +504,9 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         .env("MAPSMITH_CANVAS", path_str(&prep.canvas_json))
         .env("BG3D_IDPASS", if req.id_pass { "1" } else { "" })
         .env("MAPSMITH_JOBS", {
-            let mut jobs = vec![json!({"out": path_str(&out), "hour": req.hour, "id": req.id_pass})];
-            jobs.extend(req.also.iter().map(|a| json!({"out": path_str(&a.out_png), "hour": a.hour, "id": false})));
+            // area builds (id_pass) also get each picture's light pass, for the game's light maps
+            let mut jobs = vec![json!({"out": path_str(&out), "hour": req.hour, "id": req.id_pass, "light": req.id_pass})];
+            jobs.extend(req.also.iter().map(|a| json!({"out": path_str(&a.out_png), "hour": a.hour, "id": false, "light": req.id_pass})));
             json!(jobs).to_string()
         })
         .env("MAPSMITH_CACHE", req.cache_dir.as_deref().map(path_str).unwrap_or_default())
