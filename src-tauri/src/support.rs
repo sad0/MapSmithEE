@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
-use tauri::Manager;
 
 const LOG_MAX: u64 = 1 << 20;
 static LOG_LOCK: Mutex<()> = Mutex::new(());
@@ -18,7 +17,7 @@ const RELEASES: &str = "https://api.github.com/repos/sad0/MapSmithEE/releases?pe
 const URL_OK: [&str; 2] = ["https://github.com/sad0/", "https://discord.gg/"];
 
 pub fn log_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path().app_data_dir().unwrap_or_default().join("logs")
+    crate::data_dir(app).unwrap_or_default().join("logs")
 }
 
 fn utc_now() -> String {
@@ -123,10 +122,11 @@ pub fn system_check(app: tauri::AppHandle) -> Value {
 #[tauri::command]
 pub fn app_report(app: tauri::AppHandle) -> String {
     let st = crate::library_status(app.clone());
-    let data = app.path().app_data_dir().unwrap_or_default();
+    let data = crate::data_dir(&app).unwrap_or_default();
     let mut r = format!(
-        "MapSmithEE {} ({} {})\nBlender: {}\nModel library: {} ({})\nApp data: {}\n",
+        "MapSmithEE {}{} ({} {})\nBlender: {}\nModel library: {} ({})\nApp data: {}\n",
         env!("CARGO_PKG_VERSION"),
+        if crate::portable_dir().is_some() { " portable" } else { "" },
         std::env::consts::OS,
         std::env::consts::ARCH,
         crate::blender_of(&app).map(|p| p.display().to_string()).unwrap_or_else(|e| format!("not found ({e})")),

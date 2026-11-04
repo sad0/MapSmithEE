@@ -20,11 +20,7 @@ static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// `<app data>/camp3d`, seeded with the sample map on first call.
 pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("internal: no app data dir: {e}"))?
-        .join("camp3d");
+    let dir = crate::data_dir(app)?.join("camp3d");
     let mut seeded = LOCK.lock().map_err(|_| "internal: lock poisoned".to_string())?;
     if !*seeded {
         let res = app

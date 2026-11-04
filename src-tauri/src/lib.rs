@@ -44,6 +44,23 @@ pub struct Settings {
     pub blender_exe: String,
 }
 
+/// The portable version (the zip): a `portable.txt` next to mapsmithee.exe keeps everything in `<exe dir>/data`
+/// (settings, maps, imports, model library, renders, log, the WebView2 profile) and the rendered areas in
+/// `<exe dir>/areas`. The installed version uses the app data folder and Documents\MapSmithEE.
+pub fn portable_dir() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    dir.join("portable.txt").is_file().then(|| dir.to_path_buf())
+}
+
+/// Where MapSmithEE keeps its own data: `<exe dir>/data` (portable) or the app data folder.
+pub fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    match portable_dir() {
+        Some(d) => Ok(d.join("data")),
+        None => app.path().app_data_dir().map_err(|e| format!("internal: no app data dir: {e}")),
+    }
+}
+
 /// where the render library lives: the setting, else <app data>/library (a dev build also falls back on the
 /// author's working copy when it exists)
 pub fn library_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -51,7 +68,7 @@ pub fn library_dir(app: &tauri::AppHandle) -> PathBuf {
     if !s.library_dir.is_empty() {
         return PathBuf::from(s.library_dir);
     }
-    let own = app.path().app_data_dir().unwrap_or_default().join("library");
+    let own = data_dir(&app).unwrap_or_default().join("library");
     let dev = PathBuf::from("E:/AI/bg3d");
     if cfg!(debug_assertions) && !library::is_library(&own) && library::is_library(&dev) { dev } else { own }
 }
@@ -75,7 +92,7 @@ struct LibraryProgress {
 #[tauri::command]
 async fn library_install(app: tauri::AppHandle) -> Res<library::Status> {
     use tauri::Emitter;
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("library");
+    let dir = data_dir(&app).map_err(|e| e.to_string())?.join("library");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     LIBRARY_CANCEL.store(false, std::sync::atomic::Ordering::Relaxed);
     let a2 = app.clone();
@@ -95,7 +112,7 @@ fn library_cancel() {
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Res<PathBuf> {
-    let d = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let d = data_dir(&app).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
     Ok(d.join("settings.json"))
 }
@@ -107,8 +124,13 @@ fn load_settings(app: &tauri::AppHandle) -> Settings {
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default();
     if s.project_dir.is_empty() {
-        let docs = app.path().document_dir().unwrap_or_else(|_| PathBuf::from("."));
-        s.project_dir = docs.join("MapSmithEE").to_string_lossy().into_owned();
+        s.project_dir = match portable_dir() {
+            Some(d) => d.join("areas").to_string_lossy().into_owned(),
+            None => {
+                let docs = app.path().document_dir().unwrap_or_else(|_| PathBuf::from("."));
+                docs.join("MapSmithEE").to_string_lossy().into_owned()
+            }
+        };
     }
     if s.blocked.is_empty() {
         s.blocked = vec!["steamapps/common".into()];
@@ -467,11 +489,11 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
     let layers = ground_doc.get("layers").and_then(|l| l.as_array()).map(|l| l.len()).unwrap_or(0);
     let ground_masks: Vec<serde_json::Value> = (0..layers).map(|i| read(&format!("{}_g{i}", req.map_id)).unwrap_or(serde_json::Value::Null)).collect();
     let offsets = std::fs::read_to_string(docs.join("models").join("offsets.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
-    let work = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&req.map_id);
+    let work = data_dir(&app).map_err(|e| e.to_string())?.join("render").join(&req.map_id);
     std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
     let blender = if s.blender_exe.is_empty() { None } else { Some(PathBuf::from(&s.blender_exe)) };
     let scripts = camprender::scripts_dir(&app);
-    let cache = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join("model-cache");
+    let cache = data_dir(&app).map_err(|e| e.to_string())?.join("render").join("model-cache");
     let (night, samples, map_id) = (req.night, req.samples.clamp(4, 1024), req.map_id.clone());
     let scale = match req.scale {
         2 | 4 => req.scale,
@@ -565,7 +587,7 @@ fn build_area(
 /// the Walls tool: each piece's traced walls from the map's last render (null before any render)
 #[tauri::command]
 fn camp3d_walls(app: tauri::AppHandle, map_id: String) -> Res<Option<serde_json::Value>> {
-    let p = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&map_id).join("walls.json");
+    let p = data_dir(&app).map_err(|e| e.to_string())?.join("render").join(&map_id).join("walls.json");
     match std::fs::read_to_string(&p) {
         Ok(t) => serde_json::from_str(&t).map(Some).map_err(|e| e.to_string()),
         Err(_) => Ok(None),
@@ -575,7 +597,7 @@ fn camp3d_walls(app: tauri::AppHandle, map_id: String) -> Res<Option<serde_json:
 /// the Walls tool's "Rebuild area": the last render's pictures, the map's current walls and spots, no Blender (seconds)
 #[tauri::command]
 async fn camp3d_rebuild_area(app: tauri::AppHandle, map_id: String) -> Res<RenderAreaReport> {
-    let work = app.path().app_data_dir().map_err(|e| e.to_string())?.join("render").join(&map_id);
+    let work = data_dir(&app).map_err(|e| e.to_string())?.join("render").join(&map_id);
     let t = std::fs::read_to_string(work.join("walls.json")).map_err(|_| "render this map once first".to_string())?;
     let v: serde_json::Value = serde_json::from_str(&t).map_err(|e| e.to_string())?;
     let last: LastRender = serde_json::from_value(v["last"].clone()).map_err(|e| e.to_string())?;
@@ -606,7 +628,7 @@ fn userlib_dir_of(docs: &Path) -> PathBuf {
 }
 
 fn userlib_dir(app: &tauri::AppHandle) -> Res<PathBuf> {
-    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("userlib"))
+    Ok(data_dir(&app).map_err(|e| e.to_string())?.join("userlib"))
 }
 
 fn blender_of(app: &tauri::AppHandle) -> Res<PathBuf> {
@@ -722,7 +744,7 @@ async fn camp3d_export_scene(app: tauri::AppHandle, req: ExportReq) -> Res<Strin
     let layers = ground_doc.get("layers").and_then(|l| l.as_array()).map(|l| l.len()).unwrap_or(0);
     let ground_masks = (0..layers).map(|i| read(&format!("{}_g{i}", req.map_id)).unwrap_or(serde_json::Value::Null)).collect();
     let offsets = std::fs::read_to_string(docs.join("models").join("offsets.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
-    let data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data = data_dir(&app).map_err(|e| e.to_string())?;
     let work = data.join("render").join(&req.map_id).join("export");
     let s = load_settings(&app);
     let r = camprender::RenderRequest {
@@ -759,6 +781,11 @@ async fn camp3d_export_scene(app: tauri::AppHandle, req: ExportReq) -> Res<Strin
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // portable: the WebView2 profile (the editor's view settings) in <exe dir>/data/webview, not in the user's
+    // LocalAppData. Set before any window exists, while no other thread reads the environment
+    if let Some(d) = portable_dir() {
+        unsafe { std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", d.join("data").join("webview")) };
+    }
     let app = App::default();
     let pics = app.pics.clone();
     // the user's own pieces and textures for the editor (http://msuser.localhost/<path> on Windows)
@@ -781,7 +808,7 @@ pub fn run() {
         .register_uri_scheme_protocol("msuser", move |ctx, req| {
             let mut d = user_dir2.lock().unwrap();
             if d.is_none() {
-                *d = ctx.app_handle().path().app_data_dir().ok().map(|p| p.join("userlib"));
+                *d = crate::data_dir(ctx.app_handle()).ok().map(|p| p.join("userlib"));
             }
             let path = req.uri().path().to_string();
             match d.as_ref().and_then(|d| userlib::serve(d, &path)) {

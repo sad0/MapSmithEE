@@ -31,6 +31,11 @@ From the first look at the example camp to walking in your own area in the game.
 Your maps are saved automatically as you work, in the app's data folder (**Map ▾ → Show maps folder**); **Save to file…**
 keeps a copy anywhere (see [Maps](#3-maps)). Rendered areas go to `Documents\MapSmithEE\<area name>`.
 
+**Portable version:** `MapSmithEE_0.2.3_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
+run `mapsmithee.exe`. Everything stays in that folder: `data` (settings, maps, imports, the model library, renders, the
+log) and `areas` (the rendered areas). To update, unzip the new version over it. It needs the WebView2 runtime, already
+in Windows 10 and 11.
+
 **Help:** the **?** button holds the tutorial, the keyboard shortcuts (also **F1**), *Report a bug…*, the log folder,
 the Discord and *Check for updates*. Once a day MapSmithEE looks for a newer release and shows its link; nothing is
 installed by itself, and your maps and imports stay when you install a new version.

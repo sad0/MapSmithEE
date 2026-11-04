@@ -48,6 +48,8 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 
 1. Download `MapSmithEE_0.2.3_x64-setup.exe` from the [latest release](https://github.com/sad0/MapSmithEE/releases)
    and run it (Windows 10/11). Windows may warn that the app is not signed: *More info → Run anyway*.
+   Or take `MapSmithEE_0.2.3_x64-portable.zip`: unzip it anywhere and run `mapsmithee.exe`; everything stays in that
+   folder.
 2. To render areas, install [Blender](https://www.blender.org/download/) 5.x. MapSmithEE finds it by itself.
 3. The first time you render, MapSmithEE downloads the full-quality models (about 2.6 GB, once).
 
