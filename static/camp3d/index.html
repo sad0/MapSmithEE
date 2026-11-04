@@ -9,7 +9,10 @@ header{grid-column:1/4;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pa
 header h1{font:600 16px "Cinzel",Georgia,serif;margin:0 8px 0 0;color:var(--accent);letter-spacing:.04em}
 button,select,input{font:inherit;color:var(--fg);background:#2b241c;border:1px solid var(--line);border-radius:4px;padding:3px 8px}
 button:hover{border-color:var(--accent)}button.on{background:var(--accent);color:#1b150d;border-color:var(--accent)}
-.grp{display:flex;gap:4px;align-items:center}.lbl{color:var(--mute);font-size:12px}
+.grp{display:flex;gap:4px;align-items:center}
+.grp{position:relative}.menu{position:absolute;top:100%;right:0;z-index:30;display:flex;flex-direction:column;gap:2px;min-width:190px;margin-top:4px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px #0008}.menu[hidden]{display:none}
+/* small screens (1366x768 at 150 %: about 910x480): narrower side panels, the 3D view keeps the room */
+@media (max-width:1100px){body{grid-template-columns:205px 1fr 215px}header{gap:5px}header h1{display:none}#group{max-width:92px}}.menu button{text-align:left}.menu hr{width:100%;border:0;border-top:1px solid var(--line);margin:3px 0}.lbl{color:var(--mute);font-size:12px}
 aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:8px;min-width:0}
 aside.r{border-right:0;border-left:1px solid var(--line)}
 #tray{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:max-content;align-content:start;gap:4px;margin-top:6px}
@@ -59,7 +62,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
   <div class="grp"><span class="lbl">View</span><button id="vBG" class="on" title="The game's camera">BG camera</button><button id="vFree" title="Orbit freely">Free</button><button id="vFast" title="For big maps or slower PCs: no live shadows, fire lights or fire animation, lower resolution, and the view redraws only while you work. The render is not affected">Fast view</button></div>
   <div class="grp"><span class="lbl">Tool</span><button id="tSel" class="on">Select (Q)</button><button id="tPaint">Paint ground</button><button id="tTrees">Tree brush</button><button id="tCamp" title="Where the camp people stand, the arrival point, the exits">Camp spots</button><button id="tWalk" title="Where the party can walk (the game's search map)">Walkable</button><button id="tWallT" title="What hides the characters standing behind a piece in the game">Walls</button></div>
   <div class="grp"><span class="lbl">Light</span><button id="tDay" class="on" title="BG's sun: south-west, 45°, shadows up-right">Day</button><button id="tNight" title="Moonlight; fires, braziers, lanterns and torches lit">Night</button></div>
-  <div class="grp"><span class="lbl">Map</span><select id="mapSel"></select><button id="mapNew">New map</button><button id="mapResize">Resize</button></div>
+  <div class="grp"><span class="lbl">Map</span><select id="mapSel"></select><button id="mapMenu" title="New, rename, resize, delete, save to a file, open a file">Map ▾</button><div id="mapMenuBox" class="menu" hidden><button id="mapNew">New map…</button><button id="mapRename">Rename…</button><button id="mapResize">Resize…</button><button id="mapDelete">Delete this map…</button><hr><button id="mapToFile" title="One .mapsmith file with the layout, the painted ground and the walkable corrections: to back it up or share it">Save to file…</button><button id="mapFromFile">Open file…</button><button id="mapFolder" title="Where the editor keeps every map, saved as you work">Show maps folder</button></div></div>
   <div class="grp"><button id="calib" title="One of each model of the selected group: set each one's height on the ground, once for all">Calibrate</button><button id="calibSave" hidden>Save heights</button></div>
   <div class="grp"><button id="undo" title="Undo (Ctrl+Z)">↶</button><button id="redo" title="Redo (Ctrl+Y)">↷</button></div>
   <div class="grp"><button id="saveNow" title="Write the map, the painted ground and the walkable corrections now">Save</button><button id="preview" title="Ask Claude for a Blender render of what the BG camera sees">Preview render</button></div>
@@ -67,7 +70,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
 </header>
 
 <aside class="l">
-  <div class="row"><input id="search" placeholder="Search" style="flex:1;min-width:0"><select id="group" title="Place: where this kind of object is found"></select></div>
+  <div class="row"><input id="search" placeholder="Search" style="flex:1;min-width:0"><button id="mineOnly" title="Show only the pieces you imported">Mine</button><select id="group" title="Place: where this kind of object is found"></select></div>
   <div id="cats"></div>
   <div class="hint">Click a model, then click the ground to place it.</div>
   <div id="tray"></div>
@@ -1524,7 +1527,7 @@ $('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () 
 
 /* ---------- tray ---------- */
 // tray filters: category (icon buttons, by object type), place (#group, the model's group) and the search box
-let trayCat = null;
+let trayCat = null, lostItems = [], MINE = false; try { MINE = localStorage.getItem('map3d.mine') === '1'; } catch {}
 function buildTray() {
   const groups = [...new Set(Object.values(M).filter(m => !m.notray).map(m => m.group))].sort();
   $('group').innerHTML = `<option value="">All places</option>` + groups.map(g => `<option value="${g}">${g} (${Object.values(M).filter(m => !m.notray && m.group === g).length})</option>`).join('');
@@ -1534,7 +1537,9 @@ function buildTray() {
     b.onclick = () => { trayCat = trayCat === c.id ? null : c.id; fillTray(); $('tray').scrollTop = 0; };
     $('cats').appendChild(b);
   }
-  $('group').onchange = $('search').oninput = () => { fillTray(); $('tray').scrollTop = 0; }; fillTray();
+  $('group').onchange = $('search').oninput = () => { fillTray(); $('tray').scrollTop = 0; };
+  $('mineOnly').onclick = () => { MINE = !MINE; try { localStorage.setItem('map3d.mine', MINE ? '1' : '0'); } catch {} fillTray(); $('tray').scrollTop = 0; };
+  fillTray();
 }
 function fillTray() {
   const g = $('group').value, q = $('search').value.toLowerCase(), tray = $('tray'); tray.innerHTML = '';
@@ -1545,7 +1550,7 @@ function fillTray() {
     b.title = `${c.name} (${n})${trayCat === c.id ? ': click again for all' : ''}`; b.classList.toggle('on', trayCat === c.id); b.disabled = !n && trayCat !== c.id;
   }
   for (const [id, m] of Object.entries(M)) {
-    if (m.notray || (g && m.group !== g)) continue; if (trayCat && catOf(m) !== trayCat) continue;
+    if (m.notray || (g && m.group !== g) || (MINE && !m.user)) continue; if (trayCat && catOf(m) !== trayCat) continue;
     if (q && !(m.label + ' ' + (m.name || '') + ' ' + id).toLowerCase().includes(q)) continue;
     const b = document.createElement('button'); b.className = 'tile' + (placing === id ? ' pick' : '');
     b.title = `${m.name ? m.name + ' · ' : ''}${m.label} · ${m.dims.map(v => v.toFixed(1)).join(' × ')} m · ${id}`;
@@ -1556,7 +1561,8 @@ function fillTray() {
     b.onclick = () => { placing = id; setTool('sel'); select(null); [...tray.children].forEach(c => c.classList.toggle('pick', c === b)); getModel(id); toast('Click the ground to place it (Shift: keep placing)'); };
     tray.appendChild(b);
   }
-  if (!tray.children.length) tray.innerHTML = '<div class="hint" style="grid-column:1/-1">No object matches these filters.</div>';
+  $('mineOnly').classList.toggle('on', MINE);
+  if (!tray.children.length) tray.innerHTML = `<div class="hint" style="grid-column:1/-1">${MINE && !Object.values(M).some(m => m.user) ? 'No imports yet: Import… adds your own pieces (Mine shows only them).' : 'No object matches these filters.'}</div>`;
 }
 function toast(t) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = 'none', 2500); }
 
@@ -1600,7 +1606,7 @@ function changed() {
 }
 async function save() {
   if (saving || !dirty) return; saving = true; dirty = false; status('Saving…');
-  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items, spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: ELEV_DEG, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
+  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items.concat(lostItems), spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: ELEV_DEG, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
   catch (e) { status(e && e.code === 'permission_denied' ? 'View only: changes are not kept' : 'Save failed, will retry', 'warn'); if (e && e.code === 'permission_denied') canWrite = false; }
   saving = false; if (dirty) save();
 }
@@ -1690,7 +1696,9 @@ async function openMap(id) {
   if (layer >= GROUNDS.length) layer = 4;
   adj = GROUNDS.map(g => ({ ...ADJ0, ...(gd.adj || {})[g.id] }));
   setMapSize(tiles); showAdj();
-  S.items = (d.items || []).filter(i => M[i.m]); setTime(d.time ?? 14);
+  // pieces whose model is missing here (another PC's imports, a file from a newer version): kept in the save, not shown
+  S.items = (d.items || []).filter(i => M[i.m]); lostItems = (d.items || []).filter(i => !M[i.m]); setTime(d.time ?? 14);
+  if (lostItems.length) toast(`${lostItems.length} pieces use models you don't have: kept, not shown`);
   S.spots = d.spots || {}; S.exits = d.exits || []; S.walls = d.walls || [];
   spotset = SPOT_SETS[d.spotset] ? d.spotset : 'camp'; SPOTS = SPOT_SETS[spotset];
   walkDoc = db.doc('maps/' + id + '_walk');
@@ -1723,17 +1731,53 @@ const PRESETS = { small: [30, 22], medium: [40, 30], large: [60, 45], huge: [80,
 function sizePanel(mode) {
   // mode 'new': name + size; 'resize': size + which sides grow
   const p = $('mapPanel'); p.hidden = false; p.dataset.mode = mode;
-  $('mpNameRow').hidden = mode !== 'new'; $('mpSides').hidden = mode !== 'resize';
-  $('mpTitle').textContent = mode === 'new' ? 'New map' : 'Resize this map';
+  $('mpNameRow').hidden = mode === 'resize'; $('mpSides').hidden = mode !== 'resize';
+  for (const el of $('mapPanel').querySelectorAll('[data-preset], #mpW')) el.closest('.row').hidden = mode === 'rename';
+  $('mpTitle').textContent = { new: 'New map', resize: 'Resize this map', rename: 'Rename this map' }[mode];
   $('mpW').value = TILES[0]; $('mpH').value = TILES[1]; $('mpName').value = '';
 }
 document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { const t = PRESETS[b.dataset.preset]; $('mpW').value = t[0]; $('mpH').value = t[1]; });
 $('mapNew').onclick = () => sizePanel('new'); $('mapResize').onclick = () => sizePanel('resize');
+$('mapRename').onclick = () => { sizePanel('rename'); $('mpName').value = (maps.find(m => m.id === mapId) || {}).name || ''; $('mpName').focus(); };
+// the Map menu: opens under its button, closes on any click outside or on one of its buttons
+$('mapMenu').onclick = e => { e.stopPropagation(); $('mapMenuBox').hidden = !$('mapMenuBox').hidden; };
+addEventListener('click', () => { $('mapMenuBox').hidden = true; });
+const tauri = window.__TAURI__ && window.__TAURI__.core;
+async function flushAll() { clearTimeout(saveT); clearTimeout(gSaveT); if (dirty) await save(); if (maskDirty) await saveGround(); if (walkDirty) await saveWalk(); }
+$('mapDelete').onclick = async () => {
+  if (maps.length < 2) { toast('This is the only map: make a new one first'); return; }
+  const m = maps.find(x => x.id === mapId); if (!m || !confirm(`Delete the map "${m.name}"? This cannot be undone (Save to file… keeps a copy).`)) return;
+  clearTimeout(saveT); clearTimeout(gSaveT); dirty = maskDirty = walkDirty = false;
+  const gone = mapId; maps = maps.filter(x => x.id !== gone); await saveIndex();
+  await openMap(maps[0].id); try { await tauri.invoke('camp3d_map_delete', { mapId: gone }); } catch (e) { toast('Could not delete its files: ' + e); return; }
+  toast(`${m.name}: deleted`);
+};
+$('mapToFile').onclick = async () => {
+  const m = maps.find(x => x.id === mapId) || { name: mapId };
+  const path = await tauri.invoke('plugin:dialog|save', { options: { defaultPath: `${m.name.replace(/[\/:*?"<>|]+/g, '_')}.mapsmith`, filters: [{ name: 'MapSmithEE map', extensions: ['mapsmith'] }] } }).catch(() => null);
+  if (!path) return;
+  try { await flushAll(); await tauri.invoke('camp3d_map_export', { mapId, path }); toast('Saved to ' + path); } catch (e) { toast('Not saved: ' + e); }
+};
+$('mapFromFile').onclick = async () => {
+  const path = await tauri.invoke('plugin:dialog|open', { options: { multiple: false, directory: false, filters: [{ name: 'MapSmithEE map', extensions: ['mapsmith'] }] } }).catch(() => null);
+  if (!path) return;
+  try {
+    const e = await tauri.invoke('camp3d_map_import', { path });
+    if (maps.some(m => m.name === e.name)) e.name += ' (imported)';
+    maps.push(e); await saveIndex(); await openMap(e.id);
+    toast(`${e.name}: opened` + (lostItems.length ? ` · ${lostItems.length} pieces use imports you don't have (kept, not shown)` : ''));
+  } catch (err) { toast(String(err)); }
+};
+$('mapFolder').onclick = async () => { try { const d = await tauri.invoke('camp3d_maps_folder'); toast('Maps folder: ' + d); } catch (e) { toast(String(e)); } };
 $('mpCancel').onclick = () => $('mapPanel').hidden = true;
 $('mapSel').onchange = () => openMap($('mapSel').value);
 $('mpOk').onclick = async () => {
   const t = [Math.max(10, Math.min(120, +$('mpW').value | 0)), Math.max(8, Math.min(120, +$('mpH').value | 0))];
   $('mapPanel').hidden = true;
+  if ($('mapPanel').dataset.mode === 'rename') {
+    const info = maps.find(m => m.id === mapId), name = $('mpName').value.trim(); if (!info || !name) return;
+    info.name = name; fillMapSel(); await saveIndex(); dirty = true; await save(); toast('Renamed: ' + name); return;
+  }
   if ($('mapPanel').dataset.mode === 'new') {
     if (!db) { toast('Sign in to keep several maps'); return; }
     const name = $('mpName').value.trim() || `Map ${maps.length + 1}`;
@@ -1798,3 +1842,4 @@ boot();
 </script>
 <script src="render.js"></script>
 <script src="userlib.js"></script>
+<script src="help.js"></script>

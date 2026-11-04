@@ -8,6 +8,7 @@ pub mod library;
 pub mod camprender;
 pub mod render;
 pub mod res;
+pub mod support;
 pub mod tis;
 pub mod userlib;
 pub mod wed;
@@ -793,6 +794,11 @@ pub fn run() {
                 None => tauri::http::Response::builder().status(404).body(Vec::new()).unwrap(),
             }
         })
+        .setup(|app| {
+            support::log_panics(app.handle());
+            support::log(app.handle(), "info", &format!("MapSmithEE {} started", env!("CARGO_PKG_VERSION")));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             userlib_list,
             userlib_import,
@@ -813,6 +819,16 @@ pub fn run() {
             camp3d::camp3d_set,
             camp3d::camp3d_update,
             camp3d::camp3d_delete,
+            camp3d::camp3d_map_export,
+            camp3d::camp3d_map_import,
+            camp3d::camp3d_map_delete,
+            support::app_log,
+            support::app_report,
+            support::system_check,
+            support::update_check,
+            support::open_url,
+            support::open_logs,
+            camp3d::camp3d_maps_folder,
             campbuild_run,
             camprender::camprender_find_blender,
             blender_get,

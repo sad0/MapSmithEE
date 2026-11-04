@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.1 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.2 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,13 +21,22 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.1_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.2_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
-3. Start MapSmithEE. It opens on **Camp**, the example map.
+3. Start MapSmithEE. It opens on **Camp**, the example map. If Blender is missing, or the drive lacks the room for the
+   model library (about 6 GB during the first download), a notice says so under the top bar.
 
-Your maps are saved automatically in the app's data folder. Rendered areas go to `Documents\MapSmithEE\<area name>`.
+Your maps are saved automatically as you work, in the app's data folder (**Map ▾ → Show maps folder**); **Save to file…**
+keeps a copy anywhere (see [Maps](#3-maps)). Rendered areas go to `Documents\MapSmithEE\<area name>`.
+
+**Help:** the **?** button holds the tutorial, the keyboard shortcuts (also **F1**), *Report a bug…*, the log folder,
+the Discord and *Check for updates*. Once a day MapSmithEE looks for a newer release and shows its link; nothing is
+installed by itself, and your maps and imports stay when you install a new version.
+
+**Uninstall:** Windows' *Apps* settings. Leave *Delete the application data* unticked to keep your maps, imports and the
+model library; tick it to remove them too.
 
 ## 2. Look around
 
@@ -49,10 +58,17 @@ tool on the right. The top bar holds the view, the tools, the light, the map lis
 
 ## 3. Maps
 
-- The **Map** list switches between your maps.
-- **New map** asks for a name and a size in tiles (64×64 game pixels each): small 30×22, medium 40×30, large 60×45,
-  huge 80×60. The ground starts as grass.
-- **Resize** changes the size of the current map; tick the sides that grow (or shrink).
+- The **Map** list switches between your maps. Every change is saved as you work (the top bar says *Saved*).
+- **Map ▾** holds the rest:
+  - **New map…** asks for a name and a size in tiles (64×64 game pixels each): small 30×22, medium 40×30, large 60×45,
+    huge 80×60. The ground starts as grass.
+  - **Rename…**, and **Resize…** for the current map (tick the sides that grow, or shrink).
+  - **Delete this map…** (the last map can't be deleted).
+  - **Save to file…** writes the whole map (layout, painted ground, walkable corrections) in one `.mapsmith` file: a
+    backup, or a map to share. **Open file…** adds a `.mapsmith` file as a new map. Pieces from imports the other PC
+    doesn't have are kept in the map but not shown, until the same imports are added.
+  - **Show maps folder** opens where the editor keeps them. The `backup` folder next to it holds each map as it was
+    when the app last started (the 5 latest).
 - **Game scale & camera…** (bottom of the Map panel) sets how many game pixels a metre is, and the camera's angle. Leave
   them at 42 px/m and 38° unless you know why: 42 px/m makes BG's 72 px human about 1.7 m tall, and 38° is BG's own
   angle. The scale changes the size of everything next to the game's characters.
@@ -65,6 +81,7 @@ The palette lists every model as a picture.
   buildings, remains) filter the list; click again to see everything.
 - **All places** filters by where a thing is usually found (camp, town, nature, temple, dungeon...).
 - **Search** finds a model by name; it stays on top while the list scrolls.
+- **Mine** shows only the pieces you imported (click again for the whole library).
 
 Click a model, then click the ground to place it. Hold **Shift** to place several copies in a row. **Esc** stops.
 
@@ -284,8 +301,11 @@ a script or dialogue that uses `LeaveAreaLUA`).
 - **"Blender 5.x is needed"**: install Blender 5.x from blender.org, then reopen the Render dialog. Already installed
   somewhere else, or portable: **Choose…** next to it and pick its `blender.exe` (**Automatic** goes back to searching).
 - **The editor is slow on a big map**: turn on **Fast view** (top bar).
+- **A map went wrong**: the `backup` folder next to the maps (**Map ▾ → Show maps folder**) has it as it was at the last
+  starts; copy a file back over the one in `maps` with MapSmithEE closed, removing the `.<number>` part of its name.
 - **The model download stopped**: click **Download models** again; it resumes where it stopped.
 - **The render is slow**: the first one fills the model cache; try *Draft* while you work on the layout.
 - **Characters walk through things / get stuck**: check **Walkable** and paint the corrections.
-- **Something else**: open an [issue](https://github.com/sad0/MapSmithEE/issues) with a screenshot, or ask on the
+- **Something else**: **? → Report a bug…** copies a report (version, Blender, last log lines) to paste in a new
+  [issue](https://github.com/sad0/MapSmithEE/issues), with a screenshot; or ask on the
   [Discord](https://discord.gg/3XzeQv7HeS).

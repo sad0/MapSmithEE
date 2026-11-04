@@ -25,6 +25,10 @@ pub struct Part {
     pub sha256: String,
 }
 
+/// disk space the first download takes at its peak: the zips (about 2.6 GB) and what they unpack to, both on disk
+/// until the end
+pub const FULL_SIZE: u64 = 6_000_000_000;
+
 #[derive(Serialize, Clone, Debug)]
 pub struct Status {
     pub dir: String,

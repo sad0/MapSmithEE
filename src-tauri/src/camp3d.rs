@@ -121,7 +121,45 @@ pub fn set_doc(root: &Path, path: &str, data: Value) -> Result<(), String> {
     }
     let bytes = serde_json::to_vec(&data).map_err(|e| format!("internal: {e}"))?;
     let _g = LOCK.lock().map_err(|_| "internal: lock poisoned".to_string())?;
+    backup(root, &f);
     write_atomic(&f, &bytes)
+}
+
+/// Documents already backed up since the app started.
+static BACKED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+const BACKUPS_KEPT: usize = 5;
+
+/// The first time a map document is written in a run, the version on disk goes to
+/// `<root>/backup/<doc>.<unix seconds>.json` first; the 5 newest of each document are kept.
+/// Best effort: a failed backup never stops the save.
+fn backup(root: &Path, f: &Path) {
+    let Ok(mut done) = BACKED.lock() else { return };
+    if done.iter().any(|p| p == f) || !f.is_file() || f.parent().and_then(|p| p.file_name()) != Some("maps".as_ref()) {
+        return;
+    }
+    done.push(f.to_path_buf());
+    let Some(stem) = f.file_stem().and_then(|s| s.to_str()) else { return };
+    if stem.starts_with('_') {
+        return;
+    }
+    let dir = root.join("backup");
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    if std::fs::create_dir_all(&dir).is_err() || std::fs::copy(f, dir.join(format!("{stem}.{secs}.json"))).is_err() {
+        return;
+    }
+    let mut old: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_stem().and_then(|s| s.to_str()).and_then(|s| s.rsplit_once('.')).is_some_and(|(d, t)| d == stem && t.bytes().all(|b| b.is_ascii_digit()))
+        })
+        .collect();
+    old.sort();
+    for p in old.iter().rev().skip(BACKUPS_KEPT) {
+        let _ = std::fs::remove_file(p);
+    }
 }
 
 fn is_delete(v: &Value) -> bool {
@@ -196,6 +234,115 @@ pub async fn camp3d_delete(app: tauri::AppHandle, path: String) -> Result<(), St
     delete_doc(&root(&app)?, &path)
 }
 
+/// The part of a document name after the map id, when the document belongs to that map: `""` (the map),
+/// `"_ground"`, `"_walk"` or `"_g<n>"` (one ground layer).
+fn map_part<'a>(stem: &'a str, id: &str) -> Option<&'a str> {
+    let rest = stem.strip_prefix(id)?;
+    let layer = rest.strip_prefix("_g").is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+    (rest.is_empty() || rest == "_ground" || rest == "_walk" || layer).then_some(rest)
+}
+
+/// "Save to file…": every document of one map in one JSON file (`.mapsmith`),
+/// `{format:"mapsmithee-map", version:1, id, name, tiles, docs:{"": map, "_ground": …, "_g0": …, "_walk": …}}`.
+pub fn export_map(root: &Path, id: &str, file: &Path) -> Result<(), String> {
+    if !valid_segment(id) || id.starts_with('_') {
+        return Err(format!("invalid_argument: bad map id '{id}'"));
+    }
+    let mut docs = Map::new();
+    let rd = std::fs::read_dir(root.join("maps")).map_err(|e| format!("io: {e}"))?;
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Some(stem) = name.strip_suffix(".json") else { continue };
+        let Some(part) = map_part(stem, id) else { continue };
+        if let Some(v) = get_doc(root, &format!("maps/{stem}"))? {
+            docs.insert(part.to_string(), v);
+        }
+    }
+    let Some(main) = docs.get("") else { return Err(format!("not_found: map '{id}' has nothing saved")) };
+    let out = serde_json::json!({
+        "format": "mapsmithee-map",
+        "version": 1,
+        "app": env!("CARGO_PKG_VERSION"),
+        "id": id,
+        "name": main.get("name").cloned().unwrap_or(Value::String(id.into())),
+        "tiles": main.get("tiles").cloned().unwrap_or(Value::Null),
+        "docs": docs,
+    });
+    let bytes = serde_json::to_vec(&out).map_err(|e| format!("internal: {e}"))?;
+    std::fs::write(file, bytes).map_err(|e| format!("io: {}: {e}", file.display()))
+}
+
+/// "Open file…": a `.mapsmith` file as a new map with its own id (`new_id`); returns its `_index` entry
+/// `{id, name, tiles}` for the editor to add.
+pub fn import_map(root: &Path, file: &Path, new_id: &str) -> Result<Value, String> {
+    let b = std::fs::read(file).map_err(|e| format!("io: {}: {e}", file.display()))?;
+    let v: Value = serde_json::from_slice(&b).map_err(|_| format!("{} is not a MapSmithEE map file", file.display()))?;
+    if v.get("format").and_then(Value::as_str) != Some("mapsmithee-map") {
+        return Err(format!("{} is not a MapSmithEE map file", file.display()));
+    }
+    let Some(docs) = v.get("docs").and_then(Value::as_object).filter(|d| d.get("").is_some_and(Value::is_object)) else {
+        return Err("this map file holds no map".into());
+    };
+    for (part, data) in docs {
+        if map_part(&format!("x{part}"), "x") != Some(part.as_str()) || !data.is_object() {
+            continue;
+        }
+        set_doc(root, &format!("maps/{new_id}{part}"), data.clone())?;
+    }
+    let main = &docs[""];
+    let name = main.get("name").or(v.get("name")).and_then(Value::as_str).unwrap_or("Imported map");
+    let tiles = main.get("tiles").or(v.get("tiles")).cloned().unwrap_or(serde_json::json!([40, 30]));
+    Ok(serde_json::json!({ "id": new_id, "name": name, "tiles": tiles }))
+}
+
+#[tauri::command]
+pub async fn camp3d_map_export(app: tauri::AppHandle, map_id: String, path: String) -> Result<(), String> {
+    export_map(&root(&app)?, &map_id, Path::new(&path))
+}
+
+/// "Delete this map…": every document of the map (its backups stay in `<root>/backup`).
+pub fn delete_map(root: &Path, id: &str) -> Result<(), String> {
+    if !valid_segment(id) || id.starts_with('_') {
+        return Err(format!("invalid_argument: bad map id '{id}'"));
+    }
+    let rd = std::fs::read_dir(root.join("maps")).map_err(|e| format!("io: {e}"))?;
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if let Some(stem) = name.strip_suffix(".json").filter(|s| map_part(s, id).is_some()) {
+            delete_doc(root, &format!("maps/{stem}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn camp3d_map_delete(app: tauri::AppHandle, map_id: String) -> Result<(), String> {
+    delete_map(&root(&app)?, &map_id)
+}
+
+#[tauri::command]
+pub async fn camp3d_map_import(app: tauri::AppHandle, path: String) -> Result<Value, String> {
+    let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let mut n = ms as u64;
+    let mut id = String::new();
+    while n > 0 {
+        let d = (n % 36) as u32;
+        id.insert(0, char::from_digit(d, 36).unwrap_or('0'));
+        n /= 36;
+    }
+    import_map(&root(&app)?, Path::new(&path), &format!("m{id}"))
+}
+
+/// Opens the folder where the maps are kept (`<app data>/camp3d/maps`) in the file manager.
+#[tauri::command]
+pub async fn camp3d_maps_folder(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = root(&app)?.join("maps");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("io: {e}"))?;
+    let prog = if cfg!(windows) { "explorer" } else if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+    std::process::Command::new(prog).arg(&dir).spawn().map_err(|e| format!("{prog}: {e}"))?;
+    Ok(dir.display().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +363,37 @@ mod tests {
         for bad in ["maps", "maps/", "/x", "a/b/c", "../x", "maps/..", "maps/.hidden", "maps/a b", "maps\\x", "m/x:y", ""] {
             assert!(doc_file(r, bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn map_file() {
+        let root = tmp("mapfile");
+        for (d, v) in [("a", json!({"name": "A", "tiles": [10, 8]})), ("a_ground", json!({"split": true})), ("a_g3", json!({"mask": "x"})),
+                       ("a_walk", json!({"fix": "y"})), ("a_b", json!({"name": "other"})), ("a_gx", json!({})), ("_index", json!({"maps": []}))] {
+            set_doc(&root, &format!("maps/{d}"), v).unwrap();
+        }
+        let f = root.join("a.mapsmith");
+        export_map(&root, "a", &f).unwrap();
+        let v: Value = serde_json::from_slice(&std::fs::read(&f).unwrap()).unwrap();
+        let mut parts: Vec<_> = v["docs"].as_object().unwrap().keys().cloned().collect();
+        parts.sort();
+        assert_eq!(parts, ["", "_g3", "_ground", "_walk"]);
+        assert_eq!(import_map(&root, &f, "m2").unwrap(), json!({"id": "m2", "name": "A", "tiles": [10, 8]}));
+        assert_eq!(get_doc(&root, "maps/m2_g3").unwrap(), Some(json!({"mask": "x"})));
+        assert_eq!(get_doc(&root, "maps/m2_walk").unwrap(), Some(json!({"fix": "y"})));
+        assert!(export_map(&root, "zz", &f).is_err());
+        delete_map(&root, "a").unwrap();
+        assert_eq!(get_doc(&root, "maps/a").unwrap(), None);
+        assert_eq!(get_doc(&root, "maps/a_g3").unwrap(), None);
+        assert!(get_doc(&root, "maps/a_b").unwrap().is_some() && get_doc(&root, "maps/m2").unwrap().is_some());
+        std::fs::write(&f, b"{}").unwrap();
+        assert!(import_map(&root, &f, "m3").is_err());
+        // a second write of a document backs up the first version, once per run
+        set_doc(&root, "maps/m2", json!({"v": 2})).unwrap();
+        set_doc(&root, "maps/m2", json!({"v": 3})).unwrap();
+        let bk: Vec<_> = std::fs::read_dir(root.join("backup")).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("m2.")).collect();
+        assert_eq!(bk.len(), 1, "{bk:?}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
