@@ -7,6 +7,7 @@
 
 mod contour;
 mod files;
+pub mod water;
 pub mod light;
 mod palettes;
 mod preview;
@@ -111,6 +112,9 @@ pub struct BuildReport {
     pub walls: usize,
     pub blocked_cells: usize,
     pub flames: usize,
+    /// water cells (tiles with the water overlay under them) and the overlay's tileset; 0 / None without water
+    pub water_cells: usize,
+    pub water_overlay: Option<String>,
     /// LM/LN computed from the render's light pass (false: flat, a render made before 0.2.3)
     pub light_maps: bool,
     /// HD tiles folder (scale > 1), relative to out_dir
@@ -226,10 +230,12 @@ fn load_models(m: &Models) -> Result<HashMap<String, Model>, String> {
     }
 }
 
+/// An area name the build can use: 3 to 6 characters (its files add up to 2: AR9900LM, AR9900N), letters, digits and
+/// the signs mods put in their prefixes (G-, #, ...) that are safe in Windows file names
 pub fn validate_name(n: &str) -> Result<String, String> {
     let u = n.trim().to_ascii_uppercase();
-    if u.len() != 6 || !u.bytes().all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_') {
-        return Err(format!("area name '{n}': 6 letters or digits (e.g. AR9900)"));
+    if !(3..=6).contains(&u.len()) || !u.bytes().all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b"_-#!$&~".contains(&b)) {
+        return Err(format!("area name '{n}': 3 to 6 letters, digits or _ - # ! $ & ~ (e.g. AR9900, G-AR01)"));
     }
     Ok(u)
 }
@@ -415,9 +421,40 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         std::fs::write(d.join(&n), b).map_err(|e| format!("{}/{n}: {e}", d.display()))
     };
     let hd = load_rgb(&input.render, mw * sc, mh * sc)?;
+    // water (water.rs): where the painted water shows, and the overlay that moves under it
+    let render_dir = input.render.parent().unwrap_or(Path::new(".")).to_path_buf();
+    let id = input.id.clone().unwrap_or_else(|| sibling(&input.render, "_id"));
+    let water = water::mask(&render_dir, &id, mw, mh)?
+        .map(|h| pvrz::Water::new(h, tw, th, 64 * 64 / 50))
+        .filter(|w| !w.cells.is_empty());
+    let wkind = doc.get("water").and_then(|v| v.as_str()).unwrap_or("own").to_ascii_uppercase();
+    let game_water = water::GAME.iter().find(|g| g.0 == wkind).map(|g| g.0);
+    let (wtis, wtis_night, wframes) = match game_water {
+        Some(g) => (g.to_string(), g.to_string(), water::GAME_FRAMES),
+        None => (format!("{name}W"), format!("{name}V"), water::OWN_FRAMES),
+    };
+    let wtex: Option<Vec<u8>> = match (&water, game_water) {
+        (Some(_), None) => {
+            let p = render_dir.join("water_tex.png");
+            let im = image::open(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+            Some(im.resize_exact(64, 64, image::imageops::FilterType::Triangle).to_rgb8().into_raw())
+        }
+        _ => None,
+    };
+    if let Some(w) = &water {
+        report.water_cells = w.cells.len();
+        report.water_overlay = Some(wtis.clone());
+        if let Some(t) = &wtex {
+            write(format!("{wtis}.TIS"), &water::own_tis(t, wframes, [1.0; 3]))?;
+        }
+    }
+    let tiles = |pic: &[u8], tis: &str, scale: usize| match &water {
+        Some(w) => pvrz::build_water(pic, tw, th, tis, scale, w),
+        None => pvrz::build_scaled(pic, tw, th, tis, scale),
+    };
     if sc > 1 {
         progress(7, "HD tiles (PVRZ)");
-        let (t, p) = pvrz::build_scaled(&hd, tw, th, &name, sc);
+        let (t, p) = tiles(&hd, &name, sc);
         write_hd(format!("{name}.TIS"), &t)?;
         for (n, b) in &p {
             write_hd(format!("{n}.PVRZ"), b)?;
@@ -427,7 +464,7 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     let rgb = pvrz::downscale(&hd, mw, mh, sc);
     drop(hd);
     progress(10, "Tiles (PVRZ)");
-    let (tis, pages) = pvrz::build(&rgb, tw, th, &name);
+    let (tis, pages) = tiles(&rgb, &name, 1);
     write(format!("{name}.TIS"), &tis)?;
     report.pages = pages.len();
     for (n, b) in &pages {
@@ -436,7 +473,6 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
 
     progress(35, "Walls");
     let alpha = input.alpha.clone().unwrap_or_else(|| sibling(&input.render, "_alpha"));
-    let id = input.id.clone().unwrap_or_else(|| sibling(&input.render, "_id"));
     let (mut walls, auto) = walls(&its, &models, &id, &alpha, mw, mh, pxm, pxm * se)?;
     // walls drawn by hand in the editor, not tied to a piece: their ground line is their bottom
     for poly in doc.get("walls").and_then(|v| v.as_array()).into_iter().flatten() {
@@ -453,14 +489,21 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     }
     report.auto_walls = auto;
     report.walls = walls.len();
-    write(format!("{name}.WED"), &files::wed(tw, th, &walls, &name))?;
+    let wed_of = |tis: &str, overlay: &str| match &water {
+        Some(w) => {
+            let ww = files::WedWater { cells: &w.cells, first: tw * th, tis: overlay, frames: wframes };
+            files::wed_water(tw, th, &walls, tis, Some(&ww))
+        }
+        None => files::wed(tw, th, &walls, tis),
+    };
+    write(format!("{name}.WED"), &wed_of(&name, &wtis))?;
 
     if let Some(n) = &input.night {
         progress(50, "Night tiles (PVRZ)");
         let nhd = load_rgb(n, mw * sc, mh * sc)?;
         let nn = format!("{name}N");
         if sc > 1 {
-            let (t, p) = pvrz::build_scaled(&nhd, tw, th, &nn, sc);
+            let (t, p) = tiles(&nhd, &nn, sc);
             write_hd(format!("{nn}.TIS"), &t)?;
             for (n, b) in &p {
                 write_hd(format!("{n}.PVRZ"), b)?;
@@ -468,12 +511,15 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         }
         let nrgb = pvrz::downscale(&nhd, mw, mh, sc);
         drop(nhd);
-        let (ntis, npages) = pvrz::build(&nrgb, tw, th, &nn);
+        let (ntis, npages) = tiles(&nrgb, &nn, 1);
+        if let (Some(w), Some(t)) = (&water, &wtex) {
+            write(format!("{wtis_night}.TIS"), &water::own_tis(t, wframes, water::night_tint(&rgb, &nrgb, &w.holes)))?;
+        }
         write(format!("{nn}.TIS"), &ntis)?;
         for (n, b) in &npages {
             write(format!("{n}.PVRZ"), b)?;
         }
-        write(format!("{nn}.WED"), &files::wed(tw, th, &walls, &nn))?;
+        write(format!("{nn}.WED"), &wed_of(&nn, &wtis_night))?;
     }
 
     progress(75, "Search map");
@@ -482,7 +528,8 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
         _ => None,
     };
     let (cw, ch) = (mw / 16, mh / 12);
-    let search = search_map(&its, &models, pxm, se, cw, ch, fix.as_deref(), &exits)?;
+    let wcells = water.as_ref().map(|w| water::cells_sr(&w.holes, mw, cw, ch));
+    let search = search_map(&its, &models, pxm, se, cw, ch, fix.as_deref(), &exits, wcells.as_deref())?;
     report.blocked_cells = search.iter().filter(|&&v| v == BLOCK).count();
     let tpl_pal = |file: &str, fallback: &[u8]| -> Vec<u8> {
         sado.as_ref()
@@ -670,6 +717,7 @@ fn search_map(
     ch: usize,
     fix: Option<&str>,
     exits: &[Vec<Pt>],
+    water: Option<&[bool]>,
 ) -> Result<Vec<u8>, String> {
     let cell = (16.0 / pxm, 12.0 / (pxm * se));
     let mut img = vec![0u8; cw * ch];
@@ -697,6 +745,12 @@ fn search_map(
         }
     }
     let mut out: Vec<u8> = img.iter().map(|&v| if v > 0 { BLOCK } else { WALK }).collect();
+    // deep water where the painted water fills a cell (a ford: paint it walkable)
+    for (i, _) in water.unwrap_or(&[]).iter().enumerate().filter(|(_, w)| **w) {
+        if out[i] == WALK {
+            out[i] = water::SR_WATER;
+        }
+    }
     if let Some(url) = fix {
         // the editor's corrections: red = blocked, green = free
         for (i, p) in fix_cells(url, cw, ch)?.iter().enumerate() {
@@ -874,8 +928,12 @@ mod tests {
     #[test]
     fn names() {
         assert_eq!(validate_name("ar9900").unwrap(), "AR9900");
-        assert!(validate_name("AR990").is_err());
-        assert!(validate_name("AR99-0").is_err());
+        // mods' prefixes (szef, G3: "G-"), shorter names
+        assert_eq!(validate_name("g-ar01").unwrap(), "G-AR01");
+        assert_eq!(validate_name("AR990").unwrap(), "AR990");
+        for bad in ["AR", "AR99001", "AR 990", "AR/990", "AR:990", "AR*990"] {
+            assert!(validate_name(bad).is_err(), "{bad}");
+        }
         assert_eq!(title("lamp post"), "Lamp_Post");
     }
 

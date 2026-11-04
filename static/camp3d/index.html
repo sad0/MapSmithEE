@@ -72,6 +72,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
 <aside class="l">
   <div class="row"><input id="search" placeholder="Search" style="flex:1;min-width:0"><button id="mineOnly" title="Show only the pieces you imported">Mine</button><select id="group" title="Place: where this kind of object is found"></select></div>
   <div id="cats"></div>
+  <button id="addLight" style="width:100%;margin:4px 0 0" title="A light of your own, anywhere and at any height (lamps, magic, interiors): the render and the game's light maps take it">💡 Light</button>
   <div class="hint">Click a model, then click the ground to place it.</div>
   <div id="tray"></div>
 </aside>
@@ -116,6 +117,13 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
       <h2>Flame</h2>
       <div class="row"><label>In game</label><select id="selFlame" style="flex:1"><option value="">No flame</option><option value="FPIT1S">Small camp fire</option><option value="FPIT1M">Medium camp fire</option><option value="FPIT1L">Large camp fire</option></select></div>
       <div class="hint">The game's flame, a piece of its own: move it with the gizmo (no link to the fire pit under it).</div>
+    </div>
+    <div id="lightBox" hidden>
+      <h2>Light</h2>
+      <div class="row"><label>Colour</label><input id="lgC" type="color" value="#ffc98a"><select id="lgWhen" style="flex:1"><option value="always">Always on</option><option value="night">At night only</option></select></div>
+      <div class="row"><label>Power</label><input id="lgW" type="range" min="10" max="3000" step="10" style="flex:1"><span id="lgWL" class="lbl"></span></div>
+      <div class="row"><label>Size</label><input id="lgR" type="range" min="0.02" max="1" step="0.01" style="flex:1"><span id="lgRL" class="lbl"></span></div>
+      <div class="hint">Watts, as in Blender: a lantern is about 150, a camp fire 2700. Its height: the gizmo's ▲. A bigger size makes softer shadows.</div>
     </div>
     <div id="tentBox" hidden>
       <h2>Canvas</h2>
@@ -185,6 +193,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
   </div>
   <h2>Map</h2>
   <div class="row"><label><input id="people" type="checkbox"> Show BG people</label></div>
+  <div class="row" title="Paint water with a water ground layer (BG water): the built area gets moving water there, like BG's rivers, and the party cannot walk in it (paint a ford walkable)"><label>Water in game</label><select id="waterKind" style="flex:1"><option value="own">The painted water, moving</option><option value="WTRIV">BG's river</option><option value="WTLAKE">BG's lake</option><option value="WTSWAM">BG's swamp</option><option value="WTSTR">BG's stream</option><option value="WTWAVE">BG's sea waves</option></select></div>
   <div class="hint">At their real size in the game: an NPC on each camp spot, a party (human, elf, dwarf, halfling) at the arrival point.</div>
   <div class="hint" id="mapInfo"></div>
   <div class="row"><button id="pxmOpen" title="Rarely needed: changes the size of everything next to the game's characters, or the camera's angle">Game scale &amp; camera…</button></div>
@@ -691,6 +700,12 @@ async function spawn(it) {
     const n = new THREE.Object3D(); n.userData.item = it; n.position.fromArray(it.p);
     const o = { it, node: n, sprite: null }; refreshFlame(o); root.add(n); objs.push(o); return o;
   }
+  if (it.m === 'light') {
+    if (!it.p[1]) it.p[1] = 2.2;   // placed on the ground: a lamp's height
+    const n = new THREE.Object3D(); n.userData.item = it; n.position.fromArray(it.p);
+    n.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+    const o = { it, node: n, sprite: null }; root.add(n); objs.push(o); refreshLight(o); return o;
+  }
   const p = await getModel(it.m).catch(() => null); if (!p) return null;
   const n = p.clone(); n.userData.item = it;
   n.position.fromArray(it.p); n.quaternion.fromArray(it.q || [0, 0, 0, 1]); applyScale(n, it);
@@ -700,7 +715,7 @@ async function spawn(it) {
 }
 // size: uniform `s`, times an optional per-axis `sz` (tents: width, height, depth)
 function applyScale(n, it) {
-  if (it.m === 'flame') { n.scale.set(1, 1, 1); return; } const z = it.sz || [1, 1, 1], s = (it.s || 1) * (M[it.m] && M[it.m].px ? PXM_DEFAULT / PXM : 1); n.scale.set(s * z[0], s * z[1], s * z[2]); }
+  if (it.m === 'flame' || it.m === 'light') { n.scale.set(1, 1, 1); return; } const z = it.sz || [1, 1, 1], s = (it.s || 1) * (M[it.m] && M[it.m].px ? PXM_DEFAULT / PXM : 1); n.scale.set(s * z[0], s * z[1], s * z[2]); }
 
 /* ---------- a piece's own colour (item.col = {h, s, b, c}): the ground's CSS filter maths, in the piece's shader; the
    twin of render_map.py's recolour group ---------- */
@@ -871,6 +886,7 @@ async function saveCalib() {
 function sync(o) {
   if (o.group) { applyGroup(o); return; }
   o.it.p = o.node.position.toArray().map(v => +v.toFixed(3)); o.it.q = o.node.quaternion.toArray().map(v => +v.toFixed(5));
+  if (o.it.m === 'light') { o.node.scale.set(1, 1, 1); o.it.s = 1; o.node.position.y = Math.max(0.1, o.node.position.y); o.it.p[1] = +o.node.position.y.toFixed(3); return; }
   if (o.it.m !== 'flame') o.it.s = +(o.node.scale.y / ((o.it.sz && o.it.sz[1]) || 1)).toFixed(3);
   if (o.it.m === 'flame') {
     // the engine cannot scale an animation: the piece's scale picks the small, medium or large camp fire instead
@@ -897,7 +913,7 @@ $('selFlame').onchange = () => {
 };
 function restOnGround(o) {
   if (o.group) { applyGroup(o); for (const m of o.objs) restOnGround(m); rebase(o); placeHelpers(); return; }
-  if (o.it.m === 'flame') return;
+  if (o.it.m === 'flame' || o.it.m === 'light') return;
   if (M[o.it.m] && M[o.it.m].px) { o.node.position.y = 0; sync(o); return; }
   const b = new THREE.Box3().setFromObject(o.node); o.node.position.y -= b.min.y; sync(o);
 }
@@ -992,12 +1008,17 @@ function showSel() {
     const n = sel.objs.length, k = sel.spots.length;
     $('selName').textContent = [n ? `${n} piece${n > 1 ? 's' : ''}` : '', k ? `${k} camp spot${k > 1 ? 's' : ''}` : ''].filter(Boolean).join(' + ') + ' (Shift+box adds, Ctrl+click removes)';
     const f = sel.objs[0]; $('scl').value = (f && f.it.s) || 1; $('sclL').textContent = (+$('scl').value).toFixed(2);
-    showCol(); $('flameBox').hidden = true; $('tentBox').hidden = true; return;
+    showCol(); $('flameBox').hidden = true; $('lightBox').hidden = true; $('tentBox').hidden = true; return;
   }
   $('selName').textContent = sel ? (sel.it.m === 'flame' ? 'Camp fire flame (game animation)' : `${M[sel.it.m]?.name || M[sel.it.m]?.label || sel.it.m} · ${sel.it.m}`) : 'Nothing selected';
   if (sel) { $('scl').value = sel.it.s || 1; $('sclL').textContent = (+(sel.it.s || 1)).toFixed(2); }
   showCol();
   $('flameBox').hidden = !(sel && sel.it.m === 'flame');
+  $('lightBox').hidden = !(sel && sel.it.m === 'light');
+  if (sel && sel.it.m === 'light') {
+    const L = lightOf(sel.it); $('lgC').value = L.c; $('lgWhen').value = L.when; $('lgW').value = L.w; $('lgR').value = L.r;
+    $('lgWL').textContent = L.w + ' W'; $('lgRL').textContent = L.r.toFixed(2) + ' m';
+  }
   if (sel && sel.it.m === 'flame') $('selFlame').value = sel.it.bam || 'FPIT1L';
   const look = sel && tentLook(sel); $('tentBox').hidden = !look;
   if (look) {
@@ -1503,6 +1524,23 @@ const SUN_DIR = new THREE.Vector3(-0.61, 0, 0.79).normalize().multiplyScalar(Mat
 // render_map.py's fire lights). [share of the piece's height, intensity, reach in metres]
 const FIRES = { campfire: [0.4, 18, 14], brazier: [0.9, 9, 10], forge: [0.8, 9, 10], torch: [0.85, 5, 7], lantern: [0.7, 3, 5], 'lamp post': [0.9, 4, 8] };
 const fireGroup = new THREE.Group(); scene.add(fireGroup);
+/* ---------- the user's own lights (it.m 'light'): colour it.lc, power it.w in watts (Blender's), size it.r (soft shadows),
+   it.when 'always' or 'night'. render_map.py lights them the same way; the light pass carries them into LM/LN.
+   In the view: a three.js point light, its strength and reach from the watts (a camp fire's 2700 W = the editor's fire) */
+const lightOf = it => ({ c: it.lc || '#ffc98a', w: it.w || 300, r: it.r ?? 0.15, when: it.when || 'always' });
+function refreshLight(o) {
+  const L = lightOf(o.it), night = S.time < 6.5 || S.time > 20.5, on = L.when === 'always' || night;
+  o.node.children[0].material.color.set(on ? L.c : 0x555555);
+  let pl = o.node.children[1];
+  if (FAST || !on) { if (pl) o.node.remove(pl); return; }
+  if (!pl) { pl = new THREE.PointLight(0xffffff, 1, 1, 2); o.node.add(pl); }
+  pl.color.set(L.c); pl.intensity = 0.35 * Math.sqrt(L.w) * (night ? 1.4 : 1); pl.distance = Math.max(3, 0.27 * Math.sqrt(L.w));
+}
+function refreshLights() { for (const o of objs) if (o.it.m === 'light') refreshLight(o); }
+$('addLight').onclick = () => { placing = 'light'; setTool('sel'); select(null); [...$('tray').children].forEach(c => c.classList.remove('pick')); toast('Click the ground to place the light (Shift: keep placing)'); };
+const lgSet = (k, v) => { if (!sel || sel.it.m !== 'light') return; sel.it[k] = v; refreshLight(sel); showSel(); changed(); };
+$('lgC').oninput = () => lgSet('lc', $('lgC').value); $('lgWhen').onchange = () => lgSet('when', $('lgWhen').value);
+$('lgW').oninput = () => lgSet('w', +$('lgW').value); $('lgR').oninput = () => lgSet('r', +$('lgR').value);
 function refreshFires(night) {
   fireGroup.clear(); if (FAST) return; const k = night ? 1.4 : 0.12;
   for (const o of objs.slice()) {
@@ -1517,7 +1555,7 @@ function setTime(h) {
   // the sun stands south-west at 45°. It stays there all day (the moon too); the hour only sets colour and strength
   const day = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
   sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 80);
-  const night = h < 6.5 || h > 20.5; refreshFires(night);
+  const night = h < 6.5 || h > 20.5; refreshFires(night); refreshLights();
   for (const m of treeMats.sprite) m.color.copy(spriteTint());
   // calibrated on the Blender render of the same map (Camp, 2026-11-04: mean colour within 1 % by day, 2-12 % by
   // night): the preview models and textures are warmer than the render's, so the lights are white-balanced cooler.
@@ -1530,6 +1568,8 @@ $('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () 
 
 /* ---------- tray ---------- */
 // tray filters: category (icon buttons, by object type), place (#group, the model's group) and the search box
+let WATER = 'own';   // the built area's water overlay: 'own' (the painted texture, moving) or one of BG's (water.rs)
+$('waterKind').onchange = () => { WATER = $('waterKind').value; changed(); };
 let trayCat = null, lostItems = [], MINE = false; try { MINE = localStorage.getItem('map3d.mine') === '1'; } catch {}
 function buildTray() {
   const groups = [...new Set(Object.values(M).filter(m => !m.notray).map(m => m.group))].sort();
@@ -1609,7 +1649,7 @@ function changed() {
 }
 async function save() {
   if (saving || !dirty) return; saving = true; dirty = false; status('Saving…');
-  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items.concat(lostItems), spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: ELEV_DEG, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
+  try { await mapDoc.set({ name: (maps.find(m => m.id === mapId) || {}).name || mapId, tiles: TILES, items: S.items.concat(lostItems), spots: S.spots, exits: S.exits, walls: S.walls, spotset, time: S.time, size_m: [+W.toFixed(3), +D.toFixed(3)], px_per_m: PXM, elev: ELEV_DEG, water: WATER, map_px: MAP_PX, updated: new Date().toISOString() }); status('Saved', 'ok'); }
   catch (e) { status(e && e.code === 'permission_denied' ? 'View only: changes are not kept' : 'Save failed, will retry', 'warn'); if (e && e.code === 'permission_denied') canWrite = false; }
   saving = false; if (dirty) save();
 }
@@ -1688,6 +1728,7 @@ async function openMap(id) {
   // each map keeps its own scale; the first maps were made at 60 px/m and move to the default, keeping their size in metres
   PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
   if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
+  WATER = d.water || 'own'; $('waterKind').value = WATER;
   ELEV_DEG = d.elev >= 30 && d.elev <= 60 ? d.elev : ELEV_DEFAULT; ELEV = ELEV_DEG * Math.PI / 180;
   pxmShow();
   dropVariants(); layerUsed = GROUNDS.map((g, i) => i === 0);
@@ -1836,6 +1877,7 @@ async function boot() {
     BASE_N = GROUNDS.length;
   } catch (e) { console.warn('userlib', e); }
   M.flame = { label: 'flame', name: 'Camp fire flame (game animation)', group: 'camp', dims: [1.9, 1.9, 1.6], notray: 1 };
+  M.light = { label: 'light', name: 'Light', group: 'camp', dims: [0.3, 0.3, 0.3], notray: 1 };
   placeBG(); setFast(FAST); setTime(14); buildTray(); buildTreeKinds(); setTool('sel'); loop();
   await loadGround().catch(() => status('Ground textures missing', 'warn'));
   setMapSize(TILES); fillMapSel();

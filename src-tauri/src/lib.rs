@@ -42,6 +42,9 @@ pub struct Settings {
     /// blender.exe; empty = found automatically
     #[serde(default)]
     pub blender_exe: String,
+    /// render on the CPU (the Render dialog's tick box): for graphics cards without the memory for the scene
+    #[serde(default)]
+    pub render_cpu: bool,
 }
 
 /// The portable version (the zip): a `portable.txt` next to mapsmithee.exe keeps everything in `<exe dir>/data`
@@ -442,6 +445,11 @@ fn camp3d_render_targets() -> Vec<&'static str> {
     t
 }
 
+/// an area name the build can use (campbuild::validate_name), already in capitals
+fn area_name_ok(n: &str) -> bool {
+    n == n.to_ascii_uppercase() && campbuild::validate_name(n).is_ok()
+}
+
 #[derive(Serialize)]
 struct RenderAreaReport {
     out_dir: String,
@@ -466,8 +474,8 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
     use tauri::Emitter;
     let sadoqol = req.target == "sadoqol";
     let name = if sadoqol { "SQCAMP".to_string() } else { req.name.trim().to_ascii_uppercase() };
-    if name.len() != 6 || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
-        return Err("the area name needs exactly 6 letters or digits".into());
+    if !area_name_ok(&name) {
+        return Err(format!("{name}: an area name is 3 to 6 letters, digits or _ - # ! $ & ~"));
     }
     let s = load_settings(&app);
     let out_dir = PathBuf::from(&s.project_dir).join(&name);
@@ -509,6 +517,7 @@ async fn camp3d_render_area(app: tauri::AppHandle, req: RenderAreaReq) -> Res<Re
         // from the cache of earlier renders when they are there
         let render_end = 90;
         let r = camprender::RenderRequest {
+            cpu: s.render_cpu,
             map_doc: map_doc.clone(),
             ground_doc: ground_doc.clone(),
             ground_masks: ground_masks.clone(),
@@ -643,7 +652,15 @@ fn blender_get(app: tauri::AppHandle) -> serde_json::Value {
     let s = load_settings(&app);
     let manual = !s.blender_exe.is_empty();
     let path = blender_of(&app).ok().map(|p| p.to_string_lossy().into_owned());
-    serde_json::json!({ "path": path, "manual": manual, "set": s.blender_exe })
+    serde_json::json!({ "path": path, "manual": manual, "set": s.blender_exe, "cpu": s.render_cpu })
+}
+
+/// the Render dialog's "Render on the CPU" tick box
+#[tauri::command]
+fn render_cpu_set(app: tauri::AppHandle, on: bool) -> Res<()> {
+    let mut s = load_settings(&app);
+    s.render_cpu = on;
+    settings_set(app, s)
 }
 
 /// picks blender.exe by hand (a portable Blender, another drive); empty = back to automatic
@@ -748,6 +765,7 @@ async fn camp3d_export_scene(app: tauri::AppHandle, req: ExportReq) -> Res<Strin
     let work = data.join("render").join(&req.map_id).join("export");
     let s = load_settings(&app);
     let r = camprender::RenderRequest {
+        cpu: s.render_cpu,
         map_doc,
         ground_doc,
         ground_masks,
@@ -860,6 +878,7 @@ pub fn run() {
             camprender::camprender_find_blender,
             blender_get,
             blender_set,
+            render_cpu_set,
             camprender::camprender_run,
             camprender::camprender_cancel,
             camp3d_render_area,
@@ -869,4 +888,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running MapSmithEE");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn area_names() {
+        for ok in ["AR9900", "G-AR01", "G-CMP", "#SQ01", "ABC", "A_B$&~"] {
+            assert!(super::area_name_ok(ok), "{ok}");
+        }
+        for bad in ["AB", "AR99001", "ar9900", "G/AR01", "G AR1", "G:AR01", "G*AR01", "ÉAR001", ""] {
+            assert!(!super::area_name_ok(bad), "{bad}");
+        }
+    }
 }

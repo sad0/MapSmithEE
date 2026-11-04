@@ -1,5 +1,8 @@
 //! EE area tilesets: a TIS of PVRZ references (12-byte tiles) and the PVRZ pages (1024 x 1024 DXT1 in a PVR v3
 //! container, zlib-compressed behind its 4-byte unpacked size). No per-tile palette, so no seams between tiles.
+//! Water (see `Water`): the tiles over water get holes (DXT1's 1-bit alpha, as BG's own water areas: AR5100), the
+//! engine draws the water overlay through them; each such cell also gets an opaque copy after the grid's tiles, its
+//! WED secondary tile.
 
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
@@ -136,17 +139,75 @@ fn refit(px: &[[f32; 3]; 16], bits: u32) -> Option<([f32; 3], [f32; 3])> {
     Some((e0, e1))
 }
 
+/// a block with transparent pixels (bit i of `holes`): DXT1's 3-colour mode (c0 <= c1), index 3 = transparent; the
+/// end points from the opaque pixels only (power iteration as `block`)
+fn block_holes(px: &[[f32; 3]; 16], holes: u16) -> [u8; 8] {
+    let solid: Vec<[f32; 3]> = (0..16).filter(|i| holes >> i & 1 == 0).map(|i| px[i]).collect();
+    let (mut c0, mut c1) = (0u16, 0u16);
+    if !solid.is_empty() {
+        let n = solid.len() as f32;
+        let mean = [0, 1, 2].map(|c| solid.iter().map(|p| p[c]).sum::<f32>() / n);
+        let mut cov = [[0f32; 3]; 3];
+        for p in &solid {
+            let d = [p[0] - mean[0], p[1] - mean[1], p[2] - mean[2]];
+            for i in 0..3 {
+                for j in 0..3 {
+                    cov[i][j] += d[i] * d[j];
+                }
+            }
+        }
+        let mut axis = [1f32; 3];
+        for _ in 0..6 {
+            let a = [0, 1, 2].map(|i| cov[i][0] * axis[0] + cov[i][1] * axis[1] + cov[i][2] * axis[2]);
+            let l = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt() + 1e-6;
+            axis = a.map(|v| v / l);
+        }
+        let ts = solid.iter().map(|p| (p[0] - mean[0]) * axis[0] + (p[1] - mean[1]) * axis[1] + (p[2] - mean[2]) * axis[2]);
+        let (lo, hi) = ts.fold((f32::MAX, f32::MIN), |(lo, hi), t| (lo.min(t), hi.max(t)));
+        let end = |t: f32| [0, 1, 2].map(|c| (mean[c] + axis[c] * t).clamp(0.0, 255.0));
+        let (a, b) = (to565(end(lo)), to565(end(hi)));
+        (c0, c1) = if a <= b { (a, b) } else { (b, a) };
+    }
+    let (p0, p1) = (from565(c0), from565(c1));
+    let pal = [p0, p1, [0, 1, 2].map(|c| (p0[c] + p1[c]) / 2.0)];
+    let mut bits = 0u32;
+    for (i, p) in px.iter().enumerate() {
+        let k = if holes >> i & 1 == 1 {
+            3
+        } else {
+            let d = |q: &[f32; 3]| (p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2) + (p[2] - q[2]).powi(2);
+            (0..3).min_by(|&x, &y| d(&pal[x]).total_cmp(&d(&pal[y]))).unwrap_or(0) as u32
+        };
+        bits |= k << (2 * i);
+    }
+    let mut out = [0u8; 8];
+    out[0..2].copy_from_slice(&c0.to_le_bytes());
+    out[2..4].copy_from_slice(&c1.to_le_bytes());
+    out[4..8].copy_from_slice(&bits.to_le_bytes());
+    out
+}
+
 /// RGB (w x h, multiples of 4) -> DXT1 blocks, row-major
 pub fn dxt1(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
+    dxt1_holes(rgb, None, w, h)
+}
+
+/// `dxt1` with transparent pixels (`holes`, one flag per pixel)
+pub fn dxt1_holes(rgb: &[u8], holes: Option<&[bool]>, w: usize, h: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(w * h / 2);
     let mut px = [[0f32; 3]; 16];
     for by in 0..h / 4 {
         for bx in 0..w / 4 {
+            let mut hm = 0u16;
             for i in 0..16 {
-                let o = ((by * 4 + i / 4) * w + bx * 4 + i % 4) * 3;
+                let pi = (by * 4 + i / 4) * w + bx * 4 + i % 4;
+                let o = pi * 3;
                 px[i] = [rgb[o] as f32, rgb[o + 1] as f32, rgb[o + 2] as f32];
+                if holes.is_some_and(|hl| hl[pi]) {
+                    hm |= 1 << i;
+                }
             }
-            out.extend_from_slice(&block(&px));
+            out.extend_from_slice(&if hm == 0 { block(&px) } else { block_holes(&px, hm) });
         }
     }
     out
@@ -154,6 +215,11 @@ pub fn dxt1(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
 
 /// one zlib-packed PVR v3 DXT1 page
 pub fn pvr(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
+    pvr_holes(rgb, None, w, h)
+}
+
+/// `pvr` with transparent pixels
+pub fn pvr_holes(rgb: &[u8], holes: Option<&[bool]>, w: usize, h: usize) -> Vec<u8> {
     let mut data = Vec::with_capacity(52 + w * h / 2);
     for v in [0x03525650u32, 0] {
         data.extend_from_slice(&v.to_le_bytes());
@@ -162,7 +228,7 @@ pub fn pvr(rgb: &[u8], w: usize, h: usize) -> Vec<u8> {
     for v in [0u32, 0, h as u32, w as u32, 1, 1, 1, 1, 0] {
         data.extend_from_slice(&v.to_le_bytes());
     }
-    data.extend_from_slice(&dxt1(rgb, w, h));
+    data.extend_from_slice(&dxt1_holes(rgb, holes, w, h));
     let mut z = ZlibEncoder::new(Vec::new(), Compression::best());
     z.write_all(&data).expect("zlib in memory");
     let mut out = (data.len() as u32).to_le_bytes().to_vec();
@@ -175,30 +241,86 @@ pub fn build(rgb: &[u8], tw: usize, th: usize, tis_name: &str) -> (Vec<u8>, Vec<
     build_scaled(rgb, tw, th, tis_name, 1)
 }
 
+/// The water of an area: `holes` one flag per 1x pixel (tw*64 x th*64, true = water seen there), `cells` the tiles
+/// (index in the grid, ascending) holding any. Cell `cells[k]`'s opaque copy is tile tw*th + k.
+pub struct Water {
+    pub holes: Vec<bool>,
+    pub cells: Vec<usize>,
+}
+
+impl Water {
+    /// from the 1x water flags: a tile counts when at least `min` of its pixels are water (a few stray pixels on a
+    /// shore are not worth an overlay); the holes stay in those tiles only
+    pub fn new(holes: Vec<bool>, tw: usize, th: usize, min: usize) -> Water {
+        let w = tw * 64;
+        let cells: Vec<usize> = (0..tw * th)
+            .filter(|&c| {
+                let (tx, ty) = (c % tw, c / tw);
+                (0..64).map(|y| (0..64).filter(|x| holes[(ty * 64 + y) * w + tx * 64 + x]).count()).sum::<usize>() >= min
+            })
+            .collect();
+        let mut keep = vec![false; tw * th];
+        cells.iter().for_each(|&c| keep[c] = true);
+        let holes = holes.iter().enumerate().map(|(i, &h)| h && keep[(i / w / 64) * tw + (i % w) / 64]).collect();
+        Water { holes, cells }
+    }
+}
+
+/// `build_scaled` with water: holes in the water tiles, and their opaque copies after the grid (pages after the grid's)
+pub fn build_water(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, water: &Water) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
+    build_inner(rgb, tw, th, tis_name, scale, Some(water))
+}
+
 /// the same at `scale` x (IEX HD tiles, see IEX docs/HD_TILES.md): the picture is (tw*64*scale) x (th*64*scale), the
 /// tiles 64*scale texels (TIS header +0x14), the pages (1024*scale)^2 with the same names, the entries' x, y in
 /// texels of the HD page; the tile grid (tw x th) stays the 1x one
 pub fn build_scaled(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
+    build_inner(rgb, tw, th, tis_name, scale, None)
+}
+
+fn build_inner(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, water: Option<&Water>) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
     let (ts, ps) = (64 * scale, PAGE * scale);
     let (iw, ih) = (tw * ts, th * ts);
     let (pw, ph) = (tw.div_ceil(TPP), th.div_ceil(TPP));
-    let pages: Vec<(String, Vec<u8>)> = (0..pw * ph)
+    let extra = water.map_or(0, |w| w.cells.len());
+    let xpages = extra.div_ceil(TPP * TPP);
+    let pages: Vec<(String, Vec<u8>)> = (0..pw * ph + xpages)
         .into_par_iter()
         .map(|i| {
-            let (px, py) = (i % pw, i / pw);
             let mut page = vec![0u8; ps * ps * 3];
-            for y in 0..ps.min(ih.saturating_sub(py * ps)) {
-                let sy = py * ps + y;
-                let x0 = px * ps;
-                let n = ps.min(iw - x0);
-                page[y * ps * 3..(y * ps + n) * 3].copy_from_slice(&rgb[(sy * iw + x0) * 3..(sy * iw + x0 + n) * 3]);
+            let mut holes = water.map(|_| vec![false; ps * ps]);
+            if i < pw * ph {
+                let (px, py) = (i % pw, i / pw);
+                for y in 0..ps.min(ih.saturating_sub(py * ps)) {
+                    let sy = py * ps + y;
+                    let x0 = px * ps;
+                    let n = ps.min(iw - x0);
+                    page[y * ps * 3..(y * ps + n) * 3].copy_from_slice(&rgb[(sy * iw + x0) * 3..(sy * iw + x0 + n) * 3]);
+                    if let (Some(h), Some(w)) = (holes.as_mut(), water) {
+                        for x in 0..n {
+                            h[y * ps + x] = w.holes[(sy / scale) * (tw * 64) + (x0 + x) / scale];
+                        }
+                    }
+                }
+            } else if let Some(w) = water {
+                // the water cells' opaque copies, 256 to a page in reading order
+                let first = (i - pw * ph) * TPP * TPP;
+                for (k, &c) in w.cells.iter().enumerate().skip(first).take(TPP * TPP) {
+                    let (tx, ty, slot) = (c % tw, c / tw, k - first);
+                    let (dx, dy) = ((slot % TPP) * ts, (slot / TPP) * ts);
+                    for y in 0..ts {
+                        let s = ((ty * ts + y) * iw + tx * ts) * 3;
+                        let d = ((dy + y) * ps + dx) * 3;
+                        page[d..d + ts * 3].copy_from_slice(&rgb[s..s + ts * 3]);
+                    }
+                }
             }
-            (page_name(tis_name, i), pvr(&page, ps, ps))
+            (page_name(tis_name, i), pvr_holes(&page, holes.as_deref(), ps, ps))
         })
         .collect();
-    let mut tis = Vec::with_capacity(24 + tw * th * 12);
+    let mut tis = Vec::with_capacity(24 + (tw * th + extra) * 12);
     tis.extend_from_slice(b"TIS V1  ");
-    for v in [(tw * th) as u32, 0x0c, 0x18, ts as u32] {
+    for v in [(tw * th + extra) as u32, 0x0c, 0x18, ts as u32] {
         tis.extend_from_slice(&v.to_le_bytes());
     }
     for ty in 0..th {
@@ -207,6 +329,12 @@ pub fn build_scaled(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usi
             for v in [page, ((tx % TPP) * ts) as i32, ((ty % TPP) * ts) as i32] {
                 tis.extend_from_slice(&v.to_le_bytes());
             }
+        }
+    }
+    for k in 0..extra {
+        let slot = k % (TPP * TPP);
+        for v in [(pw * ph + k / (TPP * TPP)) as i32, ((slot % TPP) * ts) as i32, ((slot / TPP) * ts) as i32] {
+            tis.extend_from_slice(&v.to_le_bytes());
         }
     }
     (tis, pages)
@@ -237,6 +365,44 @@ pub fn downscale(rgb: &[u8], w: usize, h: usize, s: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dxt1_holes_decode_transparent() {
+        let (w, h) = (8usize, 4usize);
+        let rgb: Vec<u8> = (0..w * h).flat_map(|i| [(i * 7) as u8, 120, 200]).collect();
+        let holes: Vec<bool> = (0..w * h).map(|i| i % w >= 5).collect();
+        let d = dxt1_holes(&rgb, Some(&holes), w, h);
+        assert_eq!(d.len(), 16);
+        // first block opaque (4-colour: c0 > c1 or equal), second block with holes (c0 <= c1, index 3 where holes)
+        let c = |o: usize| u16::from_le_bytes([d[o], d[o + 1]]);
+        assert!(c(8) <= c(10));
+        let bits = u32::from_le_bytes(d[12..16].try_into().unwrap());
+        for i in 0..16 {
+            let x = 4 + i % 4;
+            assert_eq!(bits >> (2 * i) & 3 == 3, x >= 5, "pixel {i}");
+        }
+    }
+
+    #[test]
+    fn water_tiles_after_the_grid() {
+        let (tw, th) = (2usize, 2usize);
+        let rgb = vec![90u8; tw * 64 * th * 64 * 3];
+        let mut holes = vec![false; tw * 64 * th * 64];
+        for y in 64..128 {
+            for x in 0..64 {
+                holes[y * 128 + x] = x > 20;
+            }
+        }
+        holes[5] = true; // one stray pixel in cell 0: not worth an overlay
+        let w = Water::new(holes, tw, th, 16);
+        assert_eq!(w.cells, vec![2]);
+        assert!(!w.holes[5]);
+        let (tis, pages) = build_water(&rgb, tw, th, "AR9900", 1, &w);
+        assert_eq!(u32::from_le_bytes(tis[8..12].try_into().unwrap()), 5);
+        assert_eq!(pages.len(), 2);
+        let last = &tis[24 + 4 * 12..24 + 5 * 12];
+        assert_eq!(i32::from_le_bytes(last[0..4].try_into().unwrap()), 1);
+    }
 
     #[test]
     fn page_roundtrip_through_reader() {

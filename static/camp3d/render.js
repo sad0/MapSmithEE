@@ -37,6 +37,7 @@
     <label title="Also renders HD tiles (2x or 4x) for engines that draw them (IEX). The area itself stays at the game's resolution.">HD tiles <select id="rdScale"><option value="1" selected>None (1x)</option><option value="2">2x</option><option value="4">4x (slow)</option></select></label>
     <div class="note" id="rdLib">Checking the model library…</div>
     <div class="note" id="rdBl">Looking for Blender…</div>
+    <label class="chk" title="Slower. For graphics cards without the memory for the scene; a render that runs out of graphics memory goes on the CPU by itself"><input type="checkbox" id="rdCpu"> Render on the CPU</label>
     <div id="rdBar"><div></div></div><div id="rdStep"></div>
     <div id="rdBtns"><button id="rdDl" hidden>Download models</button><button id="rdCancel">Close</button><button id="rdGo" class="on">Render</button></div>
   </div>`;
@@ -47,14 +48,14 @@
   let busy = false, libOk = false, blOk = false, lastOut = '';
   const setBar = (pct, step) => { $('rdBar').style.display = 'block'; $('rdBar').firstChild.style.width = Math.max(0, Math.min(100, pct)) + '%'; $('rdStep').textContent = step || ''; };
   const sizeGb = n => (n / 1e9).toFixed(2) + ' GB';
-  const validName = s => /^[A-Z0-9_#-]{6}$/.test(s);
+  const validName = s => /^[A-Z0-9_#!$&~-]{3,6}$/.test(s);   // as lib.rs area_name_ok
 
   function refreshGo() {
     const sq = $('rdTarget').value === 'sadoqol';
     $('rdNameRow').style.display = sq ? 'none' : '';
     const n = $('rdName').value.trim().toUpperCase();
     $('rdGo').disabled = busy || !libOk || !blOk || (!sq && !validName(n));
-    $('rdName').title = validName(n) ? '' : 'Exactly 6 characters (the game names the PVRZ pages after it)';
+    $('rdName').title = validName(n) ? '' : '3 to 6 characters: letters, digits or _ - # ! $ & ~';
   }
   $('rdName').oninput = refreshGo;
   $('rdTarget').onchange = refreshGo;
@@ -79,6 +80,8 @@
       $('rdBl').innerHTML = (b ? `Blender: ${esc(b)}` : r.manual ? `Blender: ${esc(r.set)} is missing.` : 'Blender 5.x is needed: install it from <a href="https://www.blender.org/download/" target="_blank" style="color:var(--accent)">blender.org</a>, or pick a portable one.')
         + ` <a href="#" id="rdBlPick" style="color:var(--accent)">Choose…</a>` + (r.manual ? ` <a href="#" id="rdBlAuto" style="color:var(--accent)">Automatic</a>` : '');
       $('rdBl').className = 'note' + (b ? '' : ' bad');
+      $('rdCpu').checked = !!r.cpu;
+      $('rdCpu').onchange = () => invoke('render_cpu_set', { on: $('rdCpu').checked }).catch(err => { $('rdStep').textContent = String(err); });
       $('rdBlPick').onclick = async e => {
         e.preventDefault();
         const p = await invoke('plugin:dialog|open', { options: { multiple: false, directory: false, title: 'Blender', filters: /Win/.test(navigator.userAgent) ? [{ name: 'blender.exe', extensions: ['exe'] }] : [] } }).catch(() => null);

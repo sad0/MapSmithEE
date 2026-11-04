@@ -32,6 +32,7 @@ fn render_sample_map() {
         [v[0], v[1], v[2], v[3]]
     });
     let req = RenderRequest {
+        cpu: std::env::var("MAPSMITH_CPU").is_ok_and(|v| v == "1"),
         map_doc: read(&map),
         ground_doc: ground,
         ground_masks: masks,

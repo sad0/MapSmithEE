@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.3 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.4 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,7 +21,7 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.3_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.4_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
@@ -31,7 +31,7 @@ From the first look at the example camp to walking in your own area in the game.
 Your maps are saved automatically as you work, in the app's data folder (**Map ▾ → Show maps folder**); **Save to file…**
 keeps a copy anywhere (see [Maps](#3-maps)). Rendered areas go to `Documents\MapSmithEE\<area name>`.
 
-**Portable version:** `MapSmithEE_0.2.3_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
+**Portable version:** `MapSmithEE_0.2.4_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
 run `mapsmithee.exe`. Everything stays in that folder: `data` (settings, maps, imports, the model library, renders, the
 log) and `areas` (the rendered areas). To update, unzip the new version over it. It needs the WebView2 runtime, already
 in Windows 10 and 11.
@@ -215,6 +215,21 @@ the bottom of the piece walks **in front** of it; higher up, **behind** it.
 **Day** and **Night** in the top bar switch the light. Fires, braziers, lanterns and torches light their surroundings at
 night. The render makes both versions (the game switches between them by itself).
 
+### Your own lights
+
+**💡 Light** (left panel, under *Import…*), then click the ground: a light of your own, for lamps, magic or interiors.
+Raise it with the gizmo's ▲. In the Light panel: its **colour**, **always on** or **at night only**, its **power** in
+watts as in Blender (a lantern is about 150, a camp fire 2700) and its **size** (bigger = softer shadows). The render
+lights the area with it, and the game's light maps take it: characters standing in its glow take its colour.
+
+### Water
+
+Paint the water with the **BG water** ground layer (or a texture of yours whose name says *water*). In the built area
+the water moves, like BG's rivers and lakes, and the party cannot walk in it (paint a ford walkable with **Walkable**).
+**Water in game** (Map panel) picks the water drawn there: *the painted water, moving* (made from its texture, with a
+darker night version) or one of BG's own (river, lake, swamp, stream, sea waves: in BGEE, SoD and EET). Water is new:
+tell us how it looks in your game.
+
 ## 13. Render the area
 
 ![Render dialog](img/render-dialog.jpg)
@@ -223,8 +238,8 @@ Click **Render area…**.
 
 1. The first time, click **Download models**: about 2.6 GB of full-quality models, once. The download resumes if it is
    cut.
-2. **Area name**: exactly 6 characters, letters and digits (for example `AR9900`). Pick a name no other area or mod
-   uses: the game knows areas only by this name.
+2. **Area name**: 3 to 6 characters: letters, digits and `_ - # ! $ & ~` (for example `AR9900`, or `G-AR01` with a
+   mod's prefix). Pick a name no other area or mod uses: the game knows areas only by this name.
 3. **Night version too**: renders the night picture as well.
 4. **Quality**: *Draft* is fast, for checking; *Good* for playing; *Final* for a release.
 5. **HD tiles**: *None* for the game as it is. *2x* or *4x* also renders the pictures at that many times the game's
@@ -310,6 +325,9 @@ a script or dialogue that uses `LeaveAreaLUA`).
   starts; copy a file back over the one in `maps` with MapSmithEE closed, removing the `.<number>` part of its name.
 - **The model download stopped**: click **Download models** again; it resumes where it stopped.
 - **The render is slow**: the first one fills the model cache; try *Draft* while you work on the layout.
+- **"Out of GPU memory" / "Failed to build OptiX acceleration structure"**: the graphics card has not the memory for
+  the scene. MapSmithEE renders it again on the CPU by itself (slower); tick **Render on the CPU** in the Render dialog
+  to go straight there.
 - **Characters walk through things / get stuck**: check **Walkable** and paint the corrections.
 - **Something else**: **? → Report a bug…** copies a report (version, Blender, last log lines) to paste in a new
   [issue](https://github.com/sad0/MapSmithEE/issues), with a screenshot; or ask on the

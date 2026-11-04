@@ -29,6 +29,10 @@ pub struct AlsoRender {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RenderRequest {
+    /// render on the CPU (slower): for graphics cards without the memory for the scene. A GPU render that runs out
+    /// of memory is done again on the CPU by itself
+    #[serde(default)]
+    pub cpu: bool,
     /// the editor's `maps/<id>` document (raw data or wrapped `{id, data, version}`)
     pub map_doc: Value,
     /// `maps/<id>_ground`
@@ -461,7 +465,27 @@ impl Tracker {
 }
 
 /// Run the whole render: preparation, then Blender. `progress(pct 0..100, step)`; setting `cancel` kills Blender.
+/// Blender's words when the graphics card has not the memory for the scene (OptiX, CUDA, HIP, Metal)
+pub fn gpu_out_of_memory(text: &str) -> bool {
+    let l = text.to_ascii_lowercase();
+    l.contains("out of gpu memory")
+        || l.contains("failed to build optix acceleration structure")
+        || (l.contains("out of memory") && ["cuda", "optix", "hip", "metal", "gpu", "device"].iter().any(|k| l.contains(k)))
+}
+
 pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, String> {
+    match render_on(req, progress, cancel) {
+        Err(e) if !req.cpu && gpu_out_of_memory(&e) => {
+            progress(3, "Not enough graphics memory: rendering on the CPU (slower)");
+            let mut r = render_on(&RenderRequest { cpu: true, ..req.clone() }, progress, cancel)?;
+            r.device = format!("{} (the graphics card ran out of memory)", r.device);
+            Ok(r)
+        }
+        r => r,
+    }
+}
+
+fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, String> {
     let t0 = Instant::now();
     let out = std::path::absolute(&req.out_png).map_err(|e| io_err(&req.out_png, e))?;
     let out_s = path_str(&out);
@@ -503,6 +527,7 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         .env("MAPSMITH_WORK", path_str(&work))
         .env("MAPSMITH_CANVAS", path_str(&prep.canvas_json))
         .env("BG3D_IDPASS", if req.id_pass { "1" } else { "" })
+        .env("MAPSMITH_DEVICE", if req.cpu { "cpu" } else { "" })
         .env("MAPSMITH_JOBS", {
             // area builds (id_pass) also get each picture's light pass, for the game's light maps
             let mut jobs = vec![json!({"out": path_str(&out), "hour": req.hour, "id": req.id_pass, "light": req.id_pass})];
@@ -547,6 +572,8 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
     let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None, job: (1, 1) };
     let mut tail: Vec<String> = Vec::new();
     let mut traceback = false;
+    // Cycles may go on after a GPU memory error and save a black picture: that render failed
+    let mut gpu_oom = false;
     let status = loop {
         if cancel.load(Ordering::Relaxed) {
             let _ = child.kill();
@@ -556,6 +583,10 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok((is_err, line)) => {
                 traceback |= line.starts_with("Traceback");
+                gpu_oom |= gpu_out_of_memory(&line);
+                if gpu_oom {
+                    let _ = child.kill();
+                }
                 if !line.starts_with("MAPSMITH stats ") {
                     tail.push(if is_err { format!("! {line}") } else { line.clone() });
                     if tail.len() > 40 {
@@ -581,6 +612,11 @@ pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &Atomic
         Some(p) => PathBuf::from(p),
         None => out.clone(),
     };
+    if gpu_oom {
+        return Err(format!("Blender: out of GPU memory:
+{}", tail.join("
+")));
+    }
     if !status.success() || traceback || !made.is_file() {
         return Err(format!("Blender failed ({status}):\n{}", tail.join("\n")));
     }
@@ -661,6 +697,15 @@ pub fn camprender_cancel() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gpu_memory_words() {
+        assert!(gpu_out_of_memory("Error: Failed to build OptiX acceleration structure"));
+        assert!(gpu_out_of_memory("Error: System is out of GPU memory"));
+        assert!(gpu_out_of_memory("CUDA error: Out of memory in cuMemAlloc"));
+        assert!(!gpu_out_of_memory("MAPSMITH device OPTIX GPU"));
+        assert!(!gpu_out_of_memory("Python: MemoryError: out of memory"));
+    }
 
     #[test]
     fn samples_and_stages() {

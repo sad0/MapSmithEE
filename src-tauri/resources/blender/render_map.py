@@ -50,14 +50,16 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 sc.render.engine = 'CYCLES'
 prefs = bpy.context.preferences.addons['cycles'].preferences
-# OptiX first (the reference renders), else the first GPU backend this machine has, else the CPU
-for _kind in ('OPTIX', 'CUDA', 'HIP', 'ONEAPI', 'METAL'):
+# OptiX first (the reference renders), else the first GPU backend this machine has, else the CPU; MAPSMITH_DEVICE=cpu:
+# the CPU only (MapSmithEE asks for it after a graphics card ran out of memory, or when the user ticks it)
+for _kind in (() if os.environ.get('MAPSMITH_DEVICE') == 'cpu' else ('OPTIX', 'CUDA', 'HIP', 'ONEAPI', 'METAL')):
     try: prefs.compute_device_type = _kind
     except TypeError: continue
     prefs.get_devices()
     if any(d.type == _kind for d in prefs.devices): break
+_cpu = os.environ.get('MAPSMITH_DEVICE') == 'cpu'
 for d in prefs.devices: d.use = True
-sc.cycles.device = 'GPU' if any(d.type != 'CPU' for d in prefs.devices) else 'CPU'
+sc.cycles.device = 'GPU' if not _cpu and any(d.type != 'CPU' for d in prefs.devices) else 'CPU'
 sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
 print('MAPSMITH device', prefs.compute_device_type, sc.cycles.device, flush=True)
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.exposure = -0.4
@@ -107,6 +109,43 @@ nt.links.new(col, p.inputs['Base Color'])
 bump = nt.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = 0.35; bump.inputs['Distance'].default_value = 0.05
 nt.links.new(hgt, bump.inputs['Height']); nt.links.new(bump.outputs['Normal'], p.inputs['Normal'])
 gnd.data.materials.append(mat)
+
+# ---------- water: where the painted ground is water (the layers whose texture is named ...water..., and their
+# variants), in the ground's own coordinates (rows north to south: the BG camera maps them straight onto the picture),
+# for the area build's water overlay (campbuild/water.rs), next to the pictures: water_mask.png (white = water), and the
+# texture of the water layer covering most as water_tex.png (64 x 64, seamless) ----------
+OUTDIR = os.path.dirname(os.path.abspath(JOBS[0]['out']))
+def write_water():
+    import numpy as np
+    for f in ('water_mask.png', 'water_tex.png'):
+        if os.path.exists(f'{OUTDIR}/{f}'): os.remove(f'{OUTDIR}/{f}')
+    layers = G['layers']
+    is_water = [n.split('~')[0].lower().find('water') >= 0 for n in layers]
+    if not any(is_water): return
+    alphas, size = {}, None
+    for i in range(1, len(layers)):
+        url = G['masks'][i]
+        if not url: continue
+        f = f"{WORK}/masks/m{i}.{'webp' if url.startswith('data:image/webp') else 'png'}"
+        im = bpy.data.images.load(f); w_, h_ = im.size
+        a = np.empty(w_ * h_ * 4, np.float32); im.pixels.foreach_get(a); bpy.data.images.remove(im)
+        alphas[i] = a.reshape(h_, w_, 4)[::-1, :, 3]; size = size or (h_, w_)
+    size = size or (64, 64)
+    cover = np.full(size, 1.0 if is_water[0] else 0.0, np.float32)
+    share = {0: float(is_water[0])}
+    for i, a in alphas.items():
+        if a.shape != size: continue
+        cover = cover * (1 - a) + a * is_water[i]
+        if is_water[i]: share[i] = float(a.mean())
+    if cover.max() < 0.5: return
+    rgba = np.ones(size + (4,), np.float32); rgba[..., 0] = rgba[..., 1] = rgba[..., 2] = cover
+    im = bpy.data.images.new('water_mask', size[1], size[0], alpha=True); im.pixels.foreach_set(rgba[::-1].ravel())
+    im.filepath_raw = f'{OUTDIR}/water_mask.png'; im.file_format = 'PNG'; im.save(); bpy.data.images.remove(im)
+    k = max(share, key=share.get); name = layers[k].split('~')[0]
+    tex = bpy.data.images.load(TEXFILES.get(str(k)) or f'{texdir(name)}/diff_2k.jpg')
+    tex.scale(64, 64); tex.filepath_raw = f'{OUTDIR}/water_tex.png'; tex.file_format = 'PNG'; tex.save(); bpy.data.images.remove(tex)
+    print('water', name, 'covers', round(float((cover >= 0.5).mean()) * 100, 1), '% of the ground', flush=True)
+write_water()
 
 # ---------- models: one full copy per kind, linked duplicates for every placement ----------
 lib = bpy.data.collections.new('lib'); sc.collection.children.link(lib)
@@ -277,6 +316,17 @@ def light(h):
         l.location = three_to_bl(it['p']) + Vector((0, 0, max(0.7, f[0] * dims[2] * s_)))
         l.data.energy = f[1] * s_ * DAYK; l.data.color = (1.0, 0.52, 0.2); l.data.shadow_soft_size = f[2] * s_; nf += 1
     print('fire lights', nf, flush=True)
+    # the user's own lights (the editor's 'light' pieces): colour (sRGB hex), watts, size, always or by night only
+    lin = lambda v: v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    nl = 0
+    for it in L['items']:
+        if it['m'] != 'light' or (it.get('when') == 'night' and not night): continue
+        hx = (it.get('lc') or '#ffc98a').lstrip('#')
+        bpy.ops.object.light_add(type='POINT'); l = bpy.context.object; _lights.append(l)
+        l.location = three_to_bl(it['p'])
+        l.data.energy = float(it.get('w') or 300); l.data.shadow_soft_size = float(it.get('r', 0.15))
+        l.data.color = tuple(lin(int(hx[i:i + 2], 16) / 255) for i in (0, 2, 4)); nl += 1
+    print('own lights', nl, flush=True)
     w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
     w.node_tree.nodes['Background'].inputs[0].default_value = (0.04, 0.05, 0.1, 1) if night else (0.5, 0.56, 0.68, 1)
     w.node_tree.nodes['Background'].inputs[1].default_value = 0.35 if night else 0.9

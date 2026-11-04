@@ -25,9 +25,24 @@ fn bbox(v: &[Pt]) -> (i32, i32, i32, i32) {
     (xs.clone().min().unwrap_or(0), xs.max().unwrap_or(0), ys.clone().min().unwrap_or(0), ys.max().unwrap_or(0))
 }
 
+/// The water overlay of a WED: overlay 1 is the 1x1 tileset `tis` (its `frames` tiles are the animation), drawn under
+/// the grid cells `cells` (ascending), whose secondary tile is the opaque copy `first + k` (pvrz::Water)
+pub struct WedWater<'a> {
+    pub cells: &'a [usize],
+    pub first: usize,
+    pub tis: &'a str,
+    pub frames: usize,
+}
+
 /// WED V1.3: 5 overlay slots (only the first used, one tile per cell), no doors, walls as shade polygons, wall groups
 /// of 640 x 480 px listing the walls whose box touches them. Byte for byte the Python layout.
 pub fn wed(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str) -> Vec<u8> {
+    wed_water(tw, th, polys, tis, None)
+}
+
+/// `wed` with water: overlay 1 and, on the water cells, overlay mask bit 1 (value 2) and their secondary tile, as BG's
+/// own water areas (AR5100: WTRIV under the river's cells)
+pub fn wed_water(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str, water: Option<&WedWater>) -> Vec<u8> {
     let (gw, gh) = (tw.div_ceil(10), (th * 2 + 14) / 15);
     let mut groups = Vec::new();
     let mut glist: Vec<u16> = Vec::new();
@@ -49,7 +64,11 @@ pub fn wed(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str) -> Vec<u8> {
     let o_sh = o_ov + 5 * 0x18;
     let o_tm = o_sh + 0x14;
     let o_ti = o_tm + n * 10;
-    let o_poly = o_ti + n * 2;
+    // overlay 1's tile map (one cell) and its lookup (the animation's frames), after overlay 0's
+    let frames = water.map_or(0, |w| w.frames);
+    let o_tm1 = o_ti + n * 2;
+    let o_ti1 = o_tm1 + if water.is_some() { 10 } else { 0 };
+    let o_poly = o_ti1 + frames * 2;
     let o_vert = o_poly + polys.len() * 0x12;
     let nv: usize = polys.iter().map(|v| v.len()).sum();
     let o_grp = o_vert + nv * 4;
@@ -74,6 +93,24 @@ pub fn wed(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str) -> Vec<u8> {
         p16(&mut out, o + 2, 1);
         p16(&mut out, o + 4, 0xffff);
         p16(&mut out, o_ti + i * 2, i as u16);
+    }
+    if let Some(w) = water {
+        let o1 = o_ov + 0x18;
+        p16(&mut out, o1, 1);
+        p16(&mut out, o1 + 2, 1);
+        resref(&mut out, o1 + 4, 8, w.tis);
+        p32(&mut out, o1 + 0x10, o_tm1 as u32);
+        p32(&mut out, o1 + 0x14, o_ti1 as u32);
+        p16(&mut out, o_tm1 + 2, w.frames as u16);
+        p16(&mut out, o_tm1 + 4, 0xffff);
+        for f in 0..w.frames {
+            p16(&mut out, o_ti1 + f * 2, f as u16);
+        }
+        for (k, &c) in w.cells.iter().enumerate() {
+            let o = o_tm + c * 10;
+            p16(&mut out, o + 4, (w.first + k) as u16);
+            out[o + 6] = 2;
+        }
     }
     let mut vi = 0usize;
     for (i, v) in polys.iter().enumerate() {
@@ -365,6 +402,27 @@ SQCampSite = {{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wed_water_overlay() {
+        let w = WedWater { cells: &[1, 3], first: 4, tis: "AR9900W", frames: 8 };
+        let b = wed_water(2, 2, &[], "AR9900", Some(&w));
+        let u16_at = |o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
+        let u32_at = |o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap()) as usize;
+        let (ov, tm0) = (u32_at(0x10), u32_at(0x20 + 0x10));
+        assert_eq!((u16_at(ov + 0x18), u16_at(ov + 0x1a)), (1, 1));
+        assert_eq!(&b[ov + 0x18 + 4..ov + 0x18 + 11], b"AR9900W");
+        let (tm1, ti1) = (u32_at(ov + 0x18 + 0x10), u32_at(ov + 0x18 + 0x14));
+        assert_eq!(u16_at(tm1 + 2), 8);
+        assert_eq!((0..8).map(|f| u16_at(ti1 + f * 2)).collect::<Vec<_>>(), (0..8).collect::<Vec<_>>());
+        assert_eq!((u16_at(tm0 + 10 + 4), b[tm0 + 10 + 6]), (4, 2));
+        assert_eq!((u16_at(tm0 + 30 + 4), b[tm0 + 30 + 6]), (5, 2));
+        assert_eq!((u16_at(tm0 + 4), b[tm0 + 6]), (0xffff, 0));
+        // and the WED reader takes it
+        let parsed = crate::wed::parse(&b).unwrap();
+        assert_eq!(parsed.overlays.len(), 5);
+        assert_eq!(parsed.overlays[1].tileset, "AR9900W");
+    }
 
     #[test]
     fn wed_parses() {

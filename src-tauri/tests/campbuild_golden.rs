@@ -102,7 +102,7 @@ fn golden_sqcamp_and_generic() {
     let t0 = std::time::Instant::now();
     let rep = campbuild::build(
         &inp,
-        &BuildOptions { name: "SQCAMP".into(), mode: Mode::SadoQolCamp { template_dir: tpl }, out_dir: out.clone() },
+        &BuildOptions { name: "SQCAMP".into(), mode: Mode::SadoQolCamp { template_dir: tpl }, out_dir: out.clone(), scale: 1 },
         &|_, _| {},
     )
     .expect("build");
@@ -204,7 +204,7 @@ fn golden_sqcamp_and_generic() {
     let t1 = std::time::Instant::now();
     let g = campbuild::build(
         &inp,
-        &BuildOptions { name: "ar9900".into(), mode: Mode::Generic, out_dir: gout.clone() },
+        &BuildOptions { name: "ar9900".into(), mode: Mode::Generic, out_dir: gout.clone(), scale: 1 },
         &|_, _| {},
     )
     .expect("generic");
@@ -254,7 +254,7 @@ fn big_map_timing() {
     let last = std::sync::Mutex::new(std::time::Instant::now());
     let r = campbuild::build(
         &inp,
-        &BuildOptions { name: "AR9901".into(), mode: Mode::Generic, out_dir: out },
+        &BuildOptions { name: "AR9901".into(), mode: Mode::Generic, out_dir: out, scale: 1 },
         &|pct, step| {
             let mut l = last.lock().unwrap();
             println!("{:>6} ms  {pct:>3}% {step}", l.elapsed().as_millis());
