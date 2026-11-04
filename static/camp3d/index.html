@@ -193,7 +193,7 @@ h2{font:600 12px "Cinzel",Georgia,serif;letter-spacing:.06em;color:var(--accent)
   </div>
   <h2>Map</h2>
   <div class="row"><label><input id="people" type="checkbox"> Show BG people</label></div>
-  <div class="row" title="Paint water with a water ground layer (BG water): the built area gets moving water there, like BG's rivers, and the party cannot walk in it (paint a ford walkable)"><label>Water in game</label><select id="waterKind" style="flex:1"><option value="own">The painted water, moving</option><option value="WTRIV">BG's river</option><option value="WTLAKE">BG's lake</option><option value="WTSWAM">BG's swamp</option><option value="WTSTR">BG's stream</option><option value="WTWAVE">BG's sea waves</option></select></div>
+  <div class="row" title="Paint water with a water ground layer (BG water): the built area gets moving water there, like BG's rivers, and the party cannot walk in it (paint a ford walkable)"><label>Water in game</label><select id="waterKind" style="flex:1"><option value="WTRIV">BG's river</option><option value="WTLAKE">BG's lake</option><option value="WTSWAM">BG's swamp</option><option value="WTSTR">BG's stream</option><option value="WTWAVE">BG's sea waves</option><option value="own">The painted water, moving (test)</option></select></div>
   <div class="hint">At their real size in the game: an NPC on each camp spot, a party (human, elf, dwarf, halfling) at the arrival point.</div>
   <div class="hint" id="mapInfo"></div>
   <div class="row"><button id="pxmOpen" title="Rarely needed: changes the size of everything next to the game's characters, or the camera's angle">Game scale &amp; camera…</button></div>
@@ -1568,7 +1568,7 @@ $('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () 
 
 /* ---------- tray ---------- */
 // tray filters: category (icon buttons, by object type), place (#group, the model's group) and the search box
-let WATER = 'own';   // the built area's water overlay: 'own' (the painted texture, moving) or one of BG's (water.rs)
+let WATER = 'WTRIV';   // the built area's water overlay: one of BG's (water.rs; BG's river by default) or 'own' (the painted texture, moving)
 $('waterKind').onchange = () => { WATER = $('waterKind').value; changed(); };
 let trayCat = null, lostItems = [], MINE = false; try { MINE = localStorage.getItem('map3d.mine') === '1'; } catch {}
 function buildTray() {
@@ -1728,7 +1728,7 @@ async function openMap(id) {
   // each map keeps its own scale; the first maps were made at 60 px/m and move to the default, keeping their size in metres
   PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
   if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
-  WATER = d.water || 'own'; $('waterKind').value = WATER;
+  WATER = d.water || 'WTRIV'; $('waterKind').value = WATER;
   ELEV_DEG = d.elev >= 30 && d.elev <= 60 ? d.elev : ELEV_DEFAULT; ELEV = ELEV_DEG * Math.PI / 180;
   pxmShow();
   dropVariants(); layerUsed = GROUNDS.map((g, i) => i === 0);

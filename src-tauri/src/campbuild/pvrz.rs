@@ -1,8 +1,9 @@
 //! EE area tilesets: a TIS of PVRZ references (12-byte tiles) and the PVRZ pages (1024 x 1024 DXT1 in a PVR v3
 //! container, zlib-compressed behind its 4-byte unpacked size). No per-tile palette, so no seams between tiles.
 //! Water (see `Water`): the tiles over water get holes (DXT1's 1-bit alpha, as BG's own water areas: AR5100), the
-//! engine draws the water overlay through them; each such cell also gets an opaque copy after the grid's tiles, its
-//! WED secondary tile.
+//! engine draws the water overlay through them. No secondary tile: the engine draws it over the water (BG uses it
+//! for a half-clear surface), so an opaque copy hid the water's own colour, and packed with other cells on a page it
+//! bled into lines at the cells' edges (seen in game, 2026-11-04).
 
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
@@ -242,7 +243,7 @@ pub fn build(rgb: &[u8], tw: usize, th: usize, tis_name: &str) -> (Vec<u8>, Vec<
 }
 
 /// The water of an area: `holes` one flag per 1x pixel (tw*64 x th*64, true = water seen there), `cells` the tiles
-/// (index in the grid, ascending) holding any. Cell `cells[k]`'s opaque copy is tile tw*th + k.
+/// (index in the grid, ascending) holding any.
 pub struct Water {
     pub holes: Vec<bool>,
     pub cells: Vec<usize>,
@@ -266,7 +267,7 @@ impl Water {
     }
 }
 
-/// `build_scaled` with water: holes in the water tiles, and their opaque copies after the grid (pages after the grid's)
+/// `build_scaled` with water: holes in the water tiles
 pub fn build_water(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, water: &Water) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
     build_inner(rgb, tw, th, tis_name, scale, Some(water))
 }
@@ -282,14 +283,12 @@ fn build_inner(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, w
     let (ts, ps) = (64 * scale, PAGE * scale);
     let (iw, ih) = (tw * ts, th * ts);
     let (pw, ph) = (tw.div_ceil(TPP), th.div_ceil(TPP));
-    let extra = water.map_or(0, |w| w.cells.len());
-    let xpages = extra.div_ceil(TPP * TPP);
-    let pages: Vec<(String, Vec<u8>)> = (0..pw * ph + xpages)
+    let pages: Vec<(String, Vec<u8>)> = (0..pw * ph)
         .into_par_iter()
         .map(|i| {
             let mut page = vec![0u8; ps * ps * 3];
             let mut holes = water.map(|_| vec![false; ps * ps]);
-            if i < pw * ph {
+            {
                 let (px, py) = (i % pw, i / pw);
                 for y in 0..ps.min(ih.saturating_sub(py * ps)) {
                     let sy = py * ps + y;
@@ -302,25 +301,13 @@ fn build_inner(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, w
                         }
                     }
                 }
-            } else if let Some(w) = water {
-                // the water cells' opaque copies, 256 to a page in reading order
-                let first = (i - pw * ph) * TPP * TPP;
-                for (k, &c) in w.cells.iter().enumerate().skip(first).take(TPP * TPP) {
-                    let (tx, ty, slot) = (c % tw, c / tw, k - first);
-                    let (dx, dy) = ((slot % TPP) * ts, (slot / TPP) * ts);
-                    for y in 0..ts {
-                        let s = ((ty * ts + y) * iw + tx * ts) * 3;
-                        let d = ((dy + y) * ps + dx) * 3;
-                        page[d..d + ts * 3].copy_from_slice(&rgb[s..s + ts * 3]);
-                    }
-                }
             }
             (page_name(tis_name, i), pvr_holes(&page, holes.as_deref(), ps, ps))
         })
         .collect();
-    let mut tis = Vec::with_capacity(24 + (tw * th + extra) * 12);
+    let mut tis = Vec::with_capacity(24 + tw * th * 12);
     tis.extend_from_slice(b"TIS V1  ");
-    for v in [(tw * th + extra) as u32, 0x0c, 0x18, ts as u32] {
+    for v in [(tw * th) as u32, 0x0c, 0x18, ts as u32] {
         tis.extend_from_slice(&v.to_le_bytes());
     }
     for ty in 0..th {
@@ -329,12 +316,6 @@ fn build_inner(rgb: &[u8], tw: usize, th: usize, tis_name: &str, scale: usize, w
             for v in [page, ((tx % TPP) * ts) as i32, ((ty % TPP) * ts) as i32] {
                 tis.extend_from_slice(&v.to_le_bytes());
             }
-        }
-    }
-    for k in 0..extra {
-        let slot = k % (TPP * TPP);
-        for v in [(pw * ph + k / (TPP * TPP)) as i32, ((slot % TPP) * ts) as i32, ((slot / TPP) * ts) as i32] {
-            tis.extend_from_slice(&v.to_le_bytes());
         }
     }
     (tis, pages)
@@ -384,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn water_tiles_after_the_grid() {
+    fn water_cells_and_holes() {
         let (tw, th) = (2usize, 2usize);
         let rgb = vec![90u8; tw * 64 * th * 64 * 3];
         let mut holes = vec![false; tw * 64 * th * 64];
@@ -398,10 +379,8 @@ mod tests {
         assert_eq!(w.cells, vec![2]);
         assert!(!w.holes[5]);
         let (tis, pages) = build_water(&rgb, tw, th, "AR9900", 1, &w);
-        assert_eq!(u32::from_le_bytes(tis[8..12].try_into().unwrap()), 5);
-        assert_eq!(pages.len(), 2);
-        let last = &tis[24 + 4 * 12..24 + 5 * 12];
-        assert_eq!(i32::from_le_bytes(last[0..4].try_into().unwrap()), 1);
+        assert_eq!(u32::from_le_bytes(tis[8..12].try_into().unwrap()), 4);
+        assert_eq!(pages.len(), 1);
     }
 
     #[test]

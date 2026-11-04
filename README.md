@@ -6,7 +6,7 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 
 ![The Camp example in MapSmithEE's BG camera view](docs/img/bg-view.jpg)
 
-> **Early preview (0.2.4).** This is a very early version: the tool was made in about one day, the example camp
+> **Early preview (0.2.5).** This is a very early version: the tool was made in about one day, the example camp
 > included. It is rough around the edges, but it can evolve quickly, and I am very open to feedback and suggestions.
 >
 > The tool comes with models and textures from the community, plus a few AI-generated items that are not always
@@ -46,9 +46,9 @@ playable area (ARE, TIS/PVRZ, WED, search/height/light maps) ready to drop into 
 
 ## Install
 
-1. Download `MapSmithEE_0.2.4_x64-setup.exe` from the [latest release](https://github.com/sad0/MapSmithEE/releases)
+1. Download `MapSmithEE_0.2.5_x64-setup.exe` from the [latest release](https://github.com/sad0/MapSmithEE/releases)
    and run it (Windows 10/11). Windows may warn that the app is not signed: *More info → Run anyway*.
-   Or take `MapSmithEE_0.2.4_x64-portable.zip`: unzip it anywhere and run `mapsmithee.exe`; everything stays in that
+   Or take `MapSmithEE_0.2.5_x64-portable.zip`: unzip it anywhere and run `mapsmithee.exe`; everything stays in that
    folder.
 2. To render areas, install [Blender](https://www.blender.org/download/) 5.x. MapSmithEE finds it by itself.
 3. The first time you render, MapSmithEE downloads the full-quality models (about 2.6 GB, once).

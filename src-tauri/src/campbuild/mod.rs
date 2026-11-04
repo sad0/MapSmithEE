@@ -427,7 +427,8 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     let water = water::mask(&render_dir, &id, mw, mh)?
         .map(|h| pvrz::Water::new(h, tw, th, 64 * 64 / 50))
         .filter(|w| !w.cells.is_empty());
-    let wkind = doc.get("water").and_then(|v| v.as_str()).unwrap_or("own").to_ascii_uppercase();
+    // BG's river by default (in BGEE, SoD, BG2EE and EET alike): seamless, the game's own animation
+    let wkind = doc.get("water").and_then(|v| v.as_str()).unwrap_or("WTRIV").to_ascii_uppercase();
     let game_water = water::GAME.iter().find(|g| g.0 == wkind).map(|g| g.0);
     let (wtis, wtis_night, wframes) = match game_water {
         Some(g) => (g.to_string(), g.to_string(), water::GAME_FRAMES),
@@ -491,7 +492,7 @@ pub fn build(input: &BuildInput, opts: &BuildOptions, progress: &dyn Fn(u32, &st
     report.walls = walls.len();
     let wed_of = |tis: &str, overlay: &str| match &water {
         Some(w) => {
-            let ww = files::WedWater { cells: &w.cells, first: tw * th, tis: overlay, frames: wframes };
+            let ww = files::WedWater { cells: &w.cells, tis: overlay, frames: wframes };
             files::wed_water(tw, th, &walls, tis, Some(&ww))
         }
         None => files::wed(tw, th, &walls, tis),

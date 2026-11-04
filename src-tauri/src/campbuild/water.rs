@@ -1,10 +1,11 @@
 //! Water in a built area, the way BG draws its rivers and lakes (AR5100, AR4600...): WED overlay 1 is a 1x1 animated
 //! water tileset, drawn under the cells marked for it; those cells' tiles have holes where the water shows
-//! (pvrz::Water), and an opaque copy as their secondary tile (files::wed_water).
+//! (pvrz::Water). No secondary tile (see pvrz).
 //! - where: the painted ground's water layers (render_map.py's `water_mask.png` in the render folder, the ground in
 //!   its own coordinates, north at the top: the BG camera maps it straight onto the picture), where the ground is seen
 //!   (the id pass's black: a tent standing in the water hides it)
-//! - which water: one of BG's own tilesets (`GAME`, in BGEE, SoD and EET), or the painted water texture itself made
+//! - which water: one of BG's own tilesets (`GAME`, in BGEE, SoD, BG2EE and EET; BG's river by default), or the
+//!   painted water texture itself made
 //!   into one (`own_tis`: 8 frames drifting across it, a paletted TIS like BG's water tilesets), with a night version
 //!   darkened as the night render darkens the water
 //! - the search map: water cells are deep water (SR 12, not walkable), unless painted walkable in the editor
@@ -30,13 +31,18 @@ pub fn mask(render_dir: &Path, id: &Path, mw: usize, mh: usize) -> Result<Option
     let m = image::open(&mp).map_err(|e| format!("{}: {e}", mp.display()))?.to_luma8();
     let ids = image::open(id).ok().map(|im| im.to_rgb8()).filter(|im| (im.width() as usize, im.height() as usize) == (mw, mh));
     let (w, h) = (m.width() as usize, m.height() as usize);
+    // bilinear, then the half way: a smooth shore instead of the mask's own pixel steps
+    let at = |x: usize, y: usize| m.get_pixel(x.min(w - 1) as u32, y.min(h - 1) as u32).0[0] as f32;
     let mut out = vec![false; mw * mh];
     for y in 0..mh {
-        let sy = (y * h / mh).min(h - 1);
+        let fy = ((y as f32 + 0.5) * h as f32 / mh as f32 - 0.5).max(0.0);
+        let (y0, ty) = (fy as usize, fy.fract());
         for x in 0..mw {
-            let sx = (x * w / mw).min(w - 1);
+            let fx = ((x as f32 + 0.5) * w as f32 / mw as f32 - 0.5).max(0.0);
+            let (x0, tx) = (fx as usize, fx.fract());
+            let v = (at(x0, y0) * (1.0 - tx) + at(x0 + 1, y0) * tx) * (1.0 - ty) + (at(x0, y0 + 1) * (1.0 - tx) + at(x0 + 1, y0 + 1) * tx) * ty;
             let ground = ids.as_ref().is_none_or(|im| im.get_pixel(x as u32, y as u32).0 == [0, 0, 0]);
-            out[y * mw + x] = ground && m.get_pixel(sx as u32, sy as u32).0[0] >= 128;
+            out[y * mw + x] = ground && v >= 127.5;
         }
     }
     Ok(out.iter().any(|&v| v).then_some(out))

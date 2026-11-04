@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.4 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.5 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,7 +21,7 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.4_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.5_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
@@ -31,7 +31,7 @@ From the first look at the example camp to walking in your own area in the game.
 Your maps are saved automatically as you work, in the app's data folder (**Map ▾ → Show maps folder**); **Save to file…**
 keeps a copy anywhere (see [Maps](#3-maps)). Rendered areas go to `Documents\MapSmithEE\<area name>`.
 
-**Portable version:** `MapSmithEE_0.2.4_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
+**Portable version:** `MapSmithEE_0.2.5_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
 run `mapsmithee.exe`. Everything stays in that folder: `data` (settings, maps, imports, the model library, renders, the
 log) and `areas` (the rendered areas). To update, unzip the new version over it. It needs the WebView2 runtime, already
 in Windows 10 and 11.
@@ -226,9 +226,9 @@ lights the area with it, and the game's light maps take it: characters standing 
 
 Paint the water with the **BG water** ground layer (or a texture of yours whose name says *water*). In the built area
 the water moves, like BG's rivers and lakes, and the party cannot walk in it (paint a ford walkable with **Walkable**).
-**Water in game** (Map panel) picks the water drawn there: *the painted water, moving* (made from its texture, with a
-darker night version) or one of BG's own (river, lake, swamp, stream, sea waves: in BGEE, SoD and EET). Water is new:
-tell us how it looks in your game.
+**Water in game** (Map panel) picks the water drawn there: one of BG's own, animated by the game (river by default,
+lake, swamp, stream, sea waves: in every EE game), or *the painted water, moving* (made from its texture: a test, its
+tiles still show). Water is new: tell us how it looks in your game.
 
 ## 13. Render the area
 

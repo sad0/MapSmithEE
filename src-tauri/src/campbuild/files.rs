@@ -26,10 +26,9 @@ fn bbox(v: &[Pt]) -> (i32, i32, i32, i32) {
 }
 
 /// The water overlay of a WED: overlay 1 is the 1x1 tileset `tis` (its `frames` tiles are the animation), drawn under
-/// the grid cells `cells` (ascending), whose secondary tile is the opaque copy `first + k` (pvrz::Water)
+/// the grid cells `cells` (ascending; no secondary tile, see pvrz::Water)
 pub struct WedWater<'a> {
     pub cells: &'a [usize],
-    pub first: usize,
     pub tis: &'a str,
     pub frames: usize,
 }
@@ -40,7 +39,7 @@ pub fn wed(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str) -> Vec<u8> {
     wed_water(tw, th, polys, tis, None)
 }
 
-/// `wed` with water: overlay 1 and, on the water cells, overlay mask bit 1 (value 2) and their secondary tile, as BG's
+/// `wed` with water: overlay 1 and, on the water cells, overlay mask bit 1 (value 2), as BG's
 /// own water areas (AR5100: WTRIV under the river's cells)
 pub fn wed_water(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str, water: Option<&WedWater>) -> Vec<u8> {
     let (gw, gh) = (tw.div_ceil(10), (th * 2 + 14) / 15);
@@ -106,10 +105,8 @@ pub fn wed_water(tw: usize, th: usize, polys: &[Vec<Pt>], tis: &str, water: Opti
         for f in 0..w.frames {
             p16(&mut out, o_ti1 + f * 2, f as u16);
         }
-        for (k, &c) in w.cells.iter().enumerate() {
-            let o = o_tm + c * 10;
-            p16(&mut out, o + 4, (w.first + k) as u16);
-            out[o + 6] = 2;
+        for &c in w.cells {
+            out[o_tm + c * 10 + 6] = 2;
         }
     }
     let mut vi = 0usize;
@@ -405,7 +402,7 @@ mod tests {
 
     #[test]
     fn wed_water_overlay() {
-        let w = WedWater { cells: &[1, 3], first: 4, tis: "AR9900W", frames: 8 };
+        let w = WedWater { cells: &[1, 3], tis: "AR9900W", frames: 8 };
         let b = wed_water(2, 2, &[], "AR9900", Some(&w));
         let u16_at = |o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
         let u32_at = |o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap()) as usize;
@@ -415,8 +412,8 @@ mod tests {
         let (tm1, ti1) = (u32_at(ov + 0x18 + 0x10), u32_at(ov + 0x18 + 0x14));
         assert_eq!(u16_at(tm1 + 2), 8);
         assert_eq!((0..8).map(|f| u16_at(ti1 + f * 2)).collect::<Vec<_>>(), (0..8).collect::<Vec<_>>());
-        assert_eq!((u16_at(tm0 + 10 + 4), b[tm0 + 10 + 6]), (4, 2));
-        assert_eq!((u16_at(tm0 + 30 + 4), b[tm0 + 30 + 6]), (5, 2));
+        assert_eq!((u16_at(tm0 + 10 + 4), b[tm0 + 10 + 6]), (0xffff, 2));
+        assert_eq!((u16_at(tm0 + 30 + 4), b[tm0 + 30 + 6]), (0xffff, 2));
         assert_eq!((u16_at(tm0 + 4), b[tm0 + 6]), (0xffff, 0));
         // and the WED reader takes it
         let parsed = crate::wed::parse(&b).unwrap();
