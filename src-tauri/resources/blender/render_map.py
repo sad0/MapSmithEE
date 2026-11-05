@@ -61,6 +61,20 @@ _cpu = os.environ.get('MAPSMITH_DEVICE') == 'cpu'
 for d in prefs.devices: d.use = True
 sc.cycles.device = 'GPU' if not _cpu and any(d.type != 'CPU' for d in prefs.devices) else 'CPU'
 sc.cycles.samples = SAMPLES; sc.cycles.use_denoising = True
+# memory: MAPSMITH_TEXLIMIT caps every texture at that size for the render (Cycles' simplify); MAPSMITH_TILE renders
+# the picture in tiles of that size (only a tile's buffers in memory at a time). MapSmithEE lowers them step by step
+# when a render runs out of memory (camprender::render)
+if os.environ.get('MAPSMITH_TEXLIMIT'):
+    sc.render.use_simplify = True; sc.cycles.texture_limit_render = os.environ['MAPSMITH_TEXLIMIT']
+if os.environ.get('MAPSMITH_TILE'):
+    sc.cycles.use_auto_tile = True; sc.cycles.tile_size = int(os.environ['MAPSMITH_TILE'])
+print('MAPSMITH memory', os.environ.get('MAPSMITH_TEXLIMIT') or 'full', os.environ.get('MAPSMITH_TILE') or 'default', flush=True)
+# tests only (tests/camprender_render.rs): fail like a lack of memory while the textures are above this size, or on
+# the graphics card, to exercise MapSmithEE's fallbacks
+if os.environ.get('MAPSMITH_TEST_OOM') and int(os.environ.get('MAPSMITH_TEXLIMIT') or 8192) > int(os.environ['MAPSMITH_TEST_OOM']):
+    print('Error: Out of memory', flush=True); sys.exit(1)
+if os.environ.get('MAPSMITH_TEST_GPUOOM') and sc.cycles.device == 'GPU':
+    print('Error: System is out of GPU memory', flush=True); sys.exit(1)
 print('MAPSMITH device', prefs.compute_device_type, sc.cycles.device, flush=True)
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.exposure = -0.4
 # Cycles' status ('... | Updating Images', '... | Sample 3/128'): bpy.ops.render.render prints none of it by itself

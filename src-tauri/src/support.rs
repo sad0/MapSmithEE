@@ -118,17 +118,48 @@ pub fn system_check(app: tauri::AppHandle) -> Value {
     })
 }
 
+/// This PC's memory (RAM) in GB, None where unknown
+pub fn ram_gb() -> Option<f64> {
+    #[cfg(windows)]
+    {
+        #[repr(C)]
+        struct MemoryStatusEx {
+            len: u32,
+            load: u32,
+            total: u64,
+            avail: u64,
+            page_total: u64,
+            page_avail: u64,
+            virt_total: u64,
+            virt_avail: u64,
+            ext: u64,
+        }
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GlobalMemoryStatusEx(m: *mut MemoryStatusEx) -> i32;
+        }
+        let mut m = MemoryStatusEx { len: std::mem::size_of::<MemoryStatusEx>() as u32, load: 0, total: 0, avail: 0, page_total: 0, page_avail: 0, virt_total: 0, virt_avail: 0, ext: 0 };
+        // SAFETY: a zeroed struct with its length set, as the API asks
+        (unsafe { GlobalMemoryStatusEx(&mut m) } != 0).then(|| m.total as f64 / (1u64 << 30) as f64)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// "Copy bug report": version, system, Blender, model library, folders and the last lines of the log, as text.
 #[tauri::command]
 pub fn app_report(app: tauri::AppHandle) -> String {
     let st = crate::library_status(app.clone());
     let data = crate::data_dir(&app).unwrap_or_default();
     let mut r = format!(
-        "MapSmithEE {}{} ({} {})\nBlender: {}\nModel library: {} ({})\nApp data: {}\n",
+        "MapSmithEE {}{} ({} {}, {} GB RAM)\nBlender: {}\nModel library: {} ({})\nApp data: {}\n",
         env!("CARGO_PKG_VERSION"),
         if crate::portable_dir().is_some() { " portable" } else { "" },
         std::env::consts::OS,
         std::env::consts::ARCH,
+        ram_gb().map_or("?".into(), |g| format!("{g:.0}")),
         crate::blender_of(&app).map(|p| p.display().to_string()).unwrap_or_else(|e| format!("not found ({e})")),
         if st.ready { "installed" } else { "not installed" },
         crate::library_dir(&app).display(),

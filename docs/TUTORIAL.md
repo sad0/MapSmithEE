@@ -1,6 +1,6 @@
 # MapSmithEE tutorial
 
-From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.5 (early preview).
+From the first look at the example camp to walking in your own area in the game. MapSmithEE 0.2.6 (early preview).
 
 1. [Install](#1-install)
 2. [Look around](#2-look-around)
@@ -21,7 +21,7 @@ From the first look at the example camp to walking in your own area in the game.
 
 ## 1. Install
 
-1. Download `MapSmithEE_0.2.5_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
+1. Download `MapSmithEE_0.2.6_x64-setup.exe` from the [releases page](https://github.com/sad0/MapSmithEE/releases) and
    run it. The app is not signed, so Windows may show a blue warning: *More info → Run anyway*.
 2. Install [Blender](https://www.blender.org/download/) 5.x (only needed to render). MapSmithEE looks for it in the usual
    install folders; a portable Blender or one on another drive: **Choose…** in the Render dialog.
@@ -31,7 +31,7 @@ From the first look at the example camp to walking in your own area in the game.
 Your maps are saved automatically as you work, in the app's data folder (**Map ▾ → Show maps folder**); **Save to file…**
 keeps a copy anywhere (see [Maps](#3-maps)). Rendered areas go to `Documents\MapSmithEE\<area name>`.
 
-**Portable version:** `MapSmithEE_0.2.5_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
+**Portable version:** `MapSmithEE_0.2.6_x64-portable.zip` needs no install: unzip it anywhere (a USB stick too) and
 run `mapsmithee.exe`. Everything stays in that folder: `data` (settings, maps, imports, the model library, renders, the
 log) and `areas` (the rendered areas). To update, unzip the new version over it. It needs the WebView2 runtime, already
 in Windows 10 and 11.
@@ -228,7 +228,8 @@ Paint the water with the **BG water** ground layer (or a texture of yours whose 
 the water moves, like BG's rivers and lakes, and the party cannot walk in it (paint a ford walkable with **Walkable**).
 **Water in game** (Map panel) picks the water drawn there: one of BG's own, animated by the game (river by default,
 lake, swamp, stream, sea waves: in every EE game), or *the painted water, moving* (made from its texture: a test, its
-tiles still show). Water is new: tell us how it looks in your game.
+tiles still show). The editor shows the water moving in the chosen water's colour, an approximation of the game's
+own tiles (they cannot ship with MapSmithEE). Water is new: tell us how it looks in your game.
 
 ## 13. Render the area
 
@@ -325,9 +326,14 @@ a script or dialogue that uses `LeaveAreaLUA`).
   starts; copy a file back over the one in `maps` with MapSmithEE closed, removing the `.<number>` part of its name.
 - **The model download stopped**: click **Download models** again; it resumes where it stopped.
 - **The render is slow**: the first one fills the model cache; try *Draft* while you work on the layout.
-- **"Out of GPU memory" / "Failed to build OptiX acceleration structure"**: the graphics card has not the memory for
-  the scene. MapSmithEE renders it again on the CPU by itself (slower); tick **Render on the CPU** in the Render dialog
-  to go straight there.
+- **Not enough memory**: MapSmithEE handles it by itself, a step at a time. Out of graphics memory ("Out of GPU
+  memory", "Failed to build OptiX acceleration structure"), it renders on the CPU (slower; **Render on the CPU** in the
+  Render dialog goes straight there). Out of the computer's memory (RAM), it renders again with lighter textures and
+  in tiles. Textures are already capped for every render at what the game's resolution can show (1024 px, 2048 for 2x
+  HD tiles...): the same picture with far less memory (the Camp map: 5 GB instead of 25). If it still fails, the
+  message says why and what helps (close other programs, no HD tiles, fewer pieces).
+- **A render failed**: the message says what happened and what to do; the details go to the log for
+  **? → Report a bug…**.
 - **Characters walk through things / get stuck**: check **Walkable** and paint the corrections.
 - **Something else**: **? → Report a bug…** copies a report (version, Blender, last log lines) to paste in a new
   [issue](https://github.com/sad0/MapSmithEE/issues), with a screenshot; or ask on the

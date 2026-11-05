@@ -54,6 +54,9 @@ fn render_sample_map() {
         }).unwrap_or_default(),
         cache_dir: std::env::var("MAPSMITH_CACHE_DIR").ok().map(PathBuf::from),
         scripts_dir: None,
+        // MAPSMITH_TEXLIMIT: the largest texture (0 = automatic)
+        tex_limit: std::env::var("MAPSMITH_TEXLIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
+        tile: 0,
     };
     println!("blender: {:?}", find_blender());
     let t0 = std::time::Instant::now();

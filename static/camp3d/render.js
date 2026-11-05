@@ -21,7 +21,8 @@
   #rdBox .bad{color:var(--warn)}
   #rdBar{height:8px;background:#0006;border-radius:4px;overflow:hidden;margin:10px 0 4px;display:none}
   #rdBar > div{height:100%;width:0;background:var(--accent);transition:width .3s}
-  #rdStep{font-size:12px;color:var(--mute);min-height:16px}
+  #rdStep{font-size:12px;color:var(--mute);min-height:16px;white-space:pre-wrap;max-height:40vh;overflow:auto}
+  #rdStep.bad{color:var(--warn)}
   #rdBtns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
   #rdBox button:disabled{opacity:.4;cursor:default}
   `;
@@ -132,9 +133,14 @@
       // a new area: the console line that takes the party there (also in HOW_TO_TEST.txt)
       if (r.console) $('rdStep').innerHTML = `Done: ${r.files.length} files in ${r.out_dir}<br>To test it, copy them into the game's override folder, select the party in the game and type in its console (Ctrl+Space):<br><code style="user-select:all;color:var(--fg)">${r.console.replace(/</g, '&lt;')}</code>`;
       if (r.hd_dir) $('rdStep').insertAdjacentHTML('beforeend', `<br>HD tiles (IEX): ${r.hd_dir}/, same names, put them in override instead of the 1x TIS and PVRZ.`);
-      $('rdGo').textContent = 'Render again';
+      $('rdGo').textContent = 'Render again'; $('rdStep').classList.remove('bad');
     } catch (e) {
-      $('rdStep').textContent = String(e).includes('cancelled') ? 'Stopped.' : 'Render failed: ' + e;
+      // the message says what happened and what to do (camprender::explain); Blender's last lines follow it, and the
+      // whole of it goes to the log for a bug report
+      const stopped = String(e).includes('cancelled');
+      $('rdStep').textContent = stopped ? 'Stopped.' : 'Render failed. ' + e;
+      $('rdStep').classList.toggle('bad', !stopped);
+      if (!stopped) invoke('app_log', { level: 'error', msg: 'Render failed: ' + e }).catch(() => {});
     } finally { un(); busy = false; $('rdCancel').textContent = 'Close'; refreshGo(); }
   };
 

@@ -33,6 +33,15 @@ pub struct RenderRequest {
     /// of memory is done again on the CPU by itself
     #[serde(default)]
     pub cpu: bool,
+    /// largest texture size in the render (Cycles' simplify); 0 = automatic: 1024 per picture scale (2048 for 2x HD
+    /// tiles...). At BG's scale a 2 m piece is about 84 px, so bigger textures add nothing to the picture but memory:
+    /// the Camp map (1259 pieces) took 24.6 GB of RAM with the library's full textures, 5.3 GB at 1024, with the same
+    /// picture (mean difference 0.2/255, 2026-11-05). `render` lowers it when memory runs out
+    #[serde(default)]
+    pub tex_limit: u32,
+    /// render in tiles of this size (only one tile's buffers in memory); 0 = Cycles' own default
+    #[serde(default)]
+    pub tile: u32,
     /// the editor's `maps/<id>` document (raw data or wrapped `{id, data, version}`)
     pub map_doc: Value,
     /// `maps/<id>_ground`
@@ -464,7 +473,6 @@ impl Tracker {
     }
 }
 
-/// Run the whole render: preparation, then Blender. `progress(pct 0..100, step)`; setting `cancel` kills Blender.
 /// Blender's words when the graphics card has not the memory for the scene (OptiX, CUDA, HIP, Metal)
 pub fn gpu_out_of_memory(text: &str) -> bool {
     let l = text.to_ascii_lowercase();
@@ -473,36 +481,190 @@ pub fn gpu_out_of_memory(text: &str) -> bool {
         || (l.contains("out of memory") && ["cuda", "optix", "hip", "metal", "gpu", "device"].iter().any(|k| l.contains(k)))
 }
 
-pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, String> {
-    match render_on(req, progress, cancel) {
-        Err(e) if !req.cpu && gpu_out_of_memory(&e) => {
-            progress(3, "Not enough graphics memory: rendering on the CPU (slower)");
-            let mut r = render_on(&RenderRequest { cpu: true, ..req.clone() }, progress, cancel)?;
-            r.device = format!("{} (the graphics card ran out of memory)", r.device);
-            Ok(r)
-        }
-        r => r,
+/// Blender's words when the computer's own memory (RAM) runs out
+pub fn out_of_memory(text: &str) -> bool {
+    let l = text.to_ascii_lowercase();
+    ["out of memory", "memoryerror", "bad_alloc", "failed to allocate", "not enough memory", "cannot allocate"].iter().any(|k| l.contains(k))
+}
+
+/// Blender's words when the disk is full
+pub fn disk_full(text: &str) -> bool {
+    let l = text.to_ascii_lowercase();
+    ["no space left", "not enough space on the disk", "os error 112", "disk full"].iter().any(|k| l.contains(k))
+}
+
+/// Why a Blender run failed, for `render`'s fallbacks and its message
+#[derive(Debug, Clone, PartialEq)]
+pub enum Fail {
+    GpuMemory,
+    Memory,
+    /// Blender stopped by itself (a crash): its exit code
+    Crash(String),
+    Disk,
+    /// render_map.py raised an error: its last line
+    Script(String),
+    /// anything else, with Blender's exit status
+    Other(String),
+    /// the user stopped it
+    Cancelled,
+    /// before Blender ran (no Blender, no library, bad request): the message as is
+    Setup(String),
+}
+
+/// A failed run: why, and Blender's last lines (for the log and the bug report)
+#[derive(Debug, Clone)]
+pub struct Failed {
+    pub why: Fail,
+    pub tail: String,
+}
+
+impl From<String> for Failed {
+    fn from(e: String) -> Failed {
+        Failed { why: if e == "cancelled" { Fail::Cancelled } else { Fail::Setup(e) }, tail: String::new() }
     }
 }
 
-fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, String> {
+impl From<&str> for Failed {
+    fn from(e: &str) -> Failed {
+        e.to_string().into()
+    }
+}
+
+/// What a run's output says went wrong (`code`: Blender's exit code, None when it was killed or crashed hard)
+pub fn classify(tail: &str, code: Option<i32>, traceback: bool) -> Fail {
+    if gpu_out_of_memory(tail) {
+        return Fail::GpuMemory;
+    }
+    if out_of_memory(tail) || code.is_some_and(|c| c as u32 == 0xC000_0017) {
+        return Fail::Memory;
+    }
+    if disk_full(tail) {
+        return Fail::Disk;
+    }
+    if traceback {
+        let last = tail.lines().rev().map(|l| l.trim_start_matches("! ").trim()).find(|l| !l.is_empty() && !l.starts_with("Error: script failed") && !l.starts_with("Blender quit"));
+        return Fail::Script(last.unwrap_or("").to_string());
+    }
+    match code {
+        // Windows' crash codes (access violation, stack overflow, heap corruption, fail fast) or no code at all
+        Some(c) if [0xC000_0005u32, 0xC000_00FD, 0xC000_0374, 0xC000_0409].contains(&(c as u32)) => Fail::Crash(format!("0x{:08X}", c as u32)),
+        None => Fail::Crash("no exit code".into()),
+        Some(c) => Fail::Other(format!("exit code {c}")),
+    }
+}
+
+/// The steps `render` takes down when memory runs out: (largest texture per picture scale, tile size)
+const LIGHTER: [(u32, u32); 3] = [(1024, 0), (512, 1024), (256, 512)];
+
+/// The message for a render that failed for good: what happened, why, what to do. `pieces`: the map's piece count,
+/// `ram`: this PC's memory in GB
+pub fn explain(f: &Failed, pieces: usize, ram: Option<f64>) -> String {
+    let ram = ram.map(|g| format!(" (this PC has {g:.0} GB)")).unwrap_or_default();
+    let tail = if f.tail.is_empty() { String::new() } else { format!("\n\nBlender's last lines:\n{}", f.tail) };
+    match &f.why {
+        Fail::Cancelled => "cancelled".into(),
+        Fail::Setup(e) => e.clone(),
+        Fail::GpuMemory | Fail::Memory => format!(
+            "Not enough memory to render this map, even with lighter textures{ram}.\n\
+             What helps: close the other programs (browsers, games); untick HD tiles; use fewer pieces or a smaller \
+             map (this one has {pieces} pieces); then Render again.{tail}"
+        ),
+        Fail::Crash(code) => format!(
+            "Blender stopped unexpectedly ({code}), even with lighter settings.\n\
+             It often comes from the graphics driver: update it, or tick \"Render on the CPU\". If it happens again, \
+             ? > Report a bug (the report holds the details).{tail}"
+        ),
+        Fail::Disk => format!(
+            "The disk is full: Blender could not write the pictures.\n\
+             Free some space on the drive of MapSmithEE's data (a render needs a few hundred MB, the model library \
+             about 6 GB the first time), then Render again.{tail}"
+        ),
+        Fail::Script(line) => format!(
+            "MapSmithEE's render script failed: {line}\n\
+             This is a MapSmithEE bug, not your map: ? > Report a bug (the report holds the details).{tail}"
+        ),
+        Fail::Other(status) => format!(
+            "Blender failed ({status}).\n\
+             Try again; if it fails again: ? > Report a bug (the report holds the details).{tail}"
+        ),
+    }
+}
+
+/// Run the whole render: preparation, then Blender. `progress(pct 0..100, step)`; setting `cancel` kills Blender.
+/// When memory runs out it tries again by itself, a step lighter each time: a graphics card's memory -> the CPU
+/// (the computer's RAM), then smaller textures and rendering in tiles (`LIGHTER`); a crash is taken as one too (on
+/// Windows a lack of memory often ends that way). The error says what happened and what to do (`explain`).
+pub fn render(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, String> {
+    let pieces = doc_data(&req.map_doc).get("items").and_then(Value::as_array).map_or(0, Vec::len);
+    let sc = req.scale.max(1);
+    let mut r = RenderRequest { tex_limit: if req.tex_limit == 0 { 1024 * sc } else { req.tex_limit }, ..req.clone() };
+    let mut step = 0;
+    let mut notes: Vec<&str> = Vec::new();
+    loop {
+        match render_on(&r, progress, cancel) {
+            Ok(mut rep) => {
+                if !notes.is_empty() {
+                    rep.device = format!("{} ({})", rep.device, notes.join(", "));
+                }
+                return Ok(rep);
+            }
+            Err(f) => {
+                let memory = matches!(f.why, Fail::GpuMemory | Fail::Memory | Fail::Crash(_));
+                if f.why == Fail::GpuMemory && !r.cpu {
+                    progress(3, "Not enough graphics memory: rendering on the CPU (slower)");
+                    notes.push("the graphics card ran out of memory");
+                    r.cpu = true;
+                    continue;
+                }
+                if memory && step + 1 < LIGHTER.len() {
+                    step += 1;
+                    let (t, tile) = LIGHTER[step];
+                    r.tex_limit = (t * sc).min(r.tex_limit.saturating_sub(1).max(128));
+                    r.tile = tile;
+                    progress(3, &format!("Not enough memory: trying again lighter ({} of {})", step, LIGHTER.len() - 1));
+                    notes.push(if step == 1 { "lighter textures" } else { "lightest textures" });
+                    continue;
+                }
+                return Err(explain(&f, pieces, crate::support::ram_gb()));
+            }
+        }
+    }
+}
+
+fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicBool) -> Result<RenderReport, Failed> {
     let t0 = Instant::now();
     let out = std::path::absolute(&req.out_png).map_err(|e| io_err(&req.out_png, e))?;
     let out_s = path_str(&out);
     if !out_s.to_lowercase().ends_with(".png") || out_s.contains('#') {
-        return Err(format!("the output must be a .png file without '#': {out_s}"));
+        return Err(format!("the output must be a .png file without '#': {out_s}").into());
     }
-    let blender = req.blender_exe.clone().or_else(find_blender).ok_or("Blender not found: set its path in the settings")?;
+    let blender = req.blender_exe.clone().or_else(find_blender).ok_or(
+        "Blender 5.x was not found. Install it from blender.org, or pick its blender.exe with Choose… in the Render dialog \
+         (a portable Blender or one on another drive works too).",
+    )?;
     if !blender.is_file() {
-        return Err(format!("Blender not found at {}", blender.display()));
+        return Err(format!(
+            "Blender is not at {} any more (moved or uninstalled?). Pick it again with Choose… in the Render dialog, or \
+             Automatic to search the usual folders.",
+            blender.display()
+        )
+        .into());
     }
     let scripts = req.scripts_dir.clone().unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/blender"));
     let script = scripts.join("render_map.py");
     if !script.is_file() {
-        return Err(format!("render script missing: {}", script.display()));
+        return Err(format!(
+            "MapSmithEE's render script is missing ({}): the install is damaged. Install MapSmithEE again (your maps stay).",
+            script.display()
+        )
+        .into());
     }
     if !req.library_dir.join("models.json").is_file() {
-        return Err(format!("no model library at {} (models.json missing)", req.library_dir.display()));
+        return Err(format!(
+            "The model library is not at {} (models.json missing): click Download models in the Render dialog.",
+            req.library_dir.display()
+        )
+        .into());
     }
     let work = std::path::absolute(&req.work_dir).map_err(|e| io_err(&req.work_dir, e))?;
     std::fs::create_dir_all(&work).map_err(|e| io_err(&work, e))?;
@@ -528,6 +690,8 @@ fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicB
         .env("MAPSMITH_CANVAS", path_str(&prep.canvas_json))
         .env("BG3D_IDPASS", if req.id_pass { "1" } else { "" })
         .env("MAPSMITH_DEVICE", if req.cpu { "cpu" } else { "" })
+        .env("MAPSMITH_TEXLIMIT", if req.tex_limit == 0 { String::new() } else { req.tex_limit.clamp(128, 8192).next_power_of_two().min(8192).to_string() })
+        .env("MAPSMITH_TILE", if req.tile == 0 { String::new() } else { req.tile.to_string() })
         .env("MAPSMITH_JOBS", {
             // area builds (id_pass) also get each picture's light pass, for the game's light maps
             let mut jobs = vec![json!({"out": path_str(&out), "hour": req.hour, "id": req.id_pass, "light": req.id_pass})];
@@ -572,8 +736,8 @@ fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicB
     let mut tr = Tracker { id_pass: req.id_pass, stage: "load", pct: 3, step: String::new(), device: String::new(), models: (0, 0), model: String::new(), pieces: (0, 0), since: None, job: (1, 1) };
     let mut tail: Vec<String> = Vec::new();
     let mut traceback = false;
-    // Cycles may go on after a GPU memory error and save a black picture: that render failed
-    let mut gpu_oom = false;
+    // Cycles may go on after a memory error and save a black picture: that render failed
+    let mut oom = false;
     let status = loop {
         if cancel.load(Ordering::Relaxed) {
             let _ = child.kill();
@@ -583,8 +747,8 @@ fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicB
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok((is_err, line)) => {
                 traceback |= line.starts_with("Traceback");
-                gpu_oom |= gpu_out_of_memory(&line);
-                if gpu_oom {
+                if gpu_out_of_memory(&line) || out_of_memory(&line) {
+                    oom = true;
                     let _ = child.kill();
                 }
                 if !line.starts_with("MAPSMITH stats ") {
@@ -602,7 +766,7 @@ fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicB
                     progress(tr.pct, &tr.step);
                 }
             }
-            Err(mpsc::RecvTimeoutError::Disconnected) => break child.wait().map_err(|e| e.to_string())?,
+            Err(mpsc::RecvTimeoutError::Disconnected) => break child.wait().map_err(|e| Failed::from(e.to_string()))?,
         }
     };
     for r in readers {
@@ -612,13 +776,13 @@ fn render_on(req: &RenderRequest, progress: &dyn Fn(u32, &str), cancel: &AtomicB
         Some(p) => PathBuf::from(p),
         None => out.clone(),
     };
-    if gpu_oom {
-        return Err(format!("Blender: out of GPU memory:
-{}", tail.join("
-")));
-    }
-    if !status.success() || traceback || !made.is_file() {
-        return Err(format!("Blender failed ({status}):\n{}", tail.join("\n")));
+    if oom || !status.success() || traceback || !made.is_file() {
+        let tail = tail.join("\n");
+        let why = match classify(&tail, status.code(), traceback) {
+            Fail::Other(_) if status.success() && !made.is_file() => Fail::Other(format!("no picture written: {}", made.display())),
+            w => w,
+        };
+        return Err(Failed { why, tail });
     }
     let stem = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     let side = |suffix: &str| out.with_file_name(format!("{stem}{suffix}"));
@@ -697,6 +861,25 @@ pub fn camprender_cancel() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failures_and_messages() {
+        assert_eq!(classify("Error: Out of memory", Some(1), false), Fail::Memory);
+        assert_eq!(classify("Error: System is out of GPU memory", Some(1), false), Fail::GpuMemory);
+        assert_eq!(classify("Error: Failed to build OptiX acceleration structure", Some(1), false), Fail::GpuMemory);
+        assert_eq!(classify("OSError: [Errno 28] No space left on device", Some(1), true), Fail::Disk);
+        assert_eq!(classify("Traceback ...
+! KeyError: 'items'
+! Error: script failed, file: x
+Blender quit", Some(1), true), Fail::Script("KeyError: 'items'".into()));
+        assert_eq!(classify("", Some(0xC000_0005u32 as i32), false), Fail::Crash("0xC0000005".into()));
+        assert_eq!(classify("", Some(0xC000_0017u32 as i32), false), Fail::Memory);
+        assert_eq!(classify("", None, false), Fail::Crash("no exit code".into()));
+        let m = explain(&Failed { why: Fail::Memory, tail: "Error: Out of memory".into() }, 1259, Some(12.0));
+        assert!(m.starts_with("Not enough memory") && m.contains("this PC has 12 GB") && m.contains("1259 pieces") && m.contains("Error: Out of memory"), "{m}");
+        assert!(explain(&Failed { why: Fail::Crash("0xC0000005".into()), tail: String::new() }, 3, None).contains("Render on the CPU"));
+        assert_eq!(explain(&"cancelled".into(), 0, None), "cancelled");
+    }
 
     #[test]
     fn gpu_memory_words() {

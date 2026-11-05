@@ -363,6 +363,73 @@ const groundNow = () => board.visible ? board : ground;
 const border = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, 0.01, D)), new THREE.LineBasicMaterial({ color: 0xd9a441 }));
 border.position.set(W / 2, 0.02, D / 2); scene.add(border);
 const masks = GROUNDS.map(() => { const c = document.createElement('canvas'); c.width = MASK[0]; c.height = MASK[1]; return c; });
+/* ---------- moving water preview: where the painted ground ends up water (the layers whose texture is named
+   ...water..., as render_map.py and the build count it), BG's water colour for "Water in game" over a drifting grey
+   copy of the painted water texture, unlit like the game's overlay. An approximation: the game's own water tiles
+   cannot ship with MapSmithEE ---------- */
+let WATER = 'WTRIV';   // the built area's water overlay: one of BG's (water.rs; BG's river by default) or 'own' (the painted texture, moving)
+const WATER_COL = { WTRIV: 0x1a6b7e, WTLAKE: 0x47545e, WTSWAM: 0x365855, WTSTR: 0x1c466e, WTWAVE: 0x1c537a };   // their mean colour (BGEE)
+const isWater = i => baseId(GROUNDS[i].id).toLowerCase().includes('water');
+const waterCv = document.createElement('canvas'), wctx = waterCv.getContext('2d');
+const waterMask = new THREE.CanvasTexture(waterCv);
+const waterDetailCv = document.createElement('canvas'); waterDetailCv.width = waterDetailCv.height = 256;
+const waterDetail = new THREE.CanvasTexture(waterDetailCv); waterDetail.wrapS = waterDetail.wrapT = THREE.RepeatWrapping;
+// a shader of its own: three's alphaMap would take the ripples' repeat and drift (r147: one uv transform for all maps).
+// Colours in sRGB as they are (canvas bytes, BG's palette): the game shows its water tiles unlit, so does this
+const waterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+  uniforms: { detail: { value: waterDetail }, mask: { value: waterMask }, rep: { value: new THREE.Vector2(1, 1) }, off: { value: new THREE.Vector2() }, col: { value: new THREE.Color(1, 1, 1) } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D detail, mask; uniform vec2 rep, off; uniform vec3 col; varying vec2 vUv; ' +
+    'void main() { gl_FragColor = vec4(col * 2.0 * texture2D(detail, vUv * rep + off).rgb, texture2D(mask, vUv).a); }',
+  transparent: true, depthWrite: false,
+}));
+waterPlane.rotation.x = -Math.PI / 2; waterPlane.renderOrder = 1; waterPlane.visible = false; scene.add(waterPlane);
+let waterQueued = false;
+function updateWater() {
+  // coverage = each layer in order: a water layer adds its mask (source-over), any other takes it away
+  // (destination-out): cover * (1 - a) + a * water, as write_water() in render_map.py
+  waterQueued = false;
+  // a new size needs a new texture on the graphics card (three keeps the old one's size)
+  if (waterCv.width !== MASK[0] || waterCv.height !== MASK[1]) { waterCv.width = MASK[0]; waterCv.height = MASK[1]; waterMask.dispose(); }
+  wctx.clearRect(0, 0, MASK[0], MASK[1]);
+  let any = false;
+  masks.forEach((m, i) => {
+    if (!layerUsed[i]) return;
+    wctx.globalCompositeOperation = isWater(i) ? 'source-over' : 'destination-out';
+    if (i === 0) { if (isWater(0)) { wctx.fillStyle = '#fff'; wctx.fillRect(0, 0, MASK[0], MASK[1]); any = true; } return; }
+    wctx.drawImage(m, 0, 0); any = any || isWater(i);
+  });
+  wctx.globalCompositeOperation = 'source-over';
+  waterMask.needsUpdate = true;
+  waterPlane.visible = any; waterPlane.scale.set(W, D, 1); waterPlane.position.set(W / 2, 0.01, D / 2);
+  waterTint();
+}
+const queueWater = () => { if (!waterQueued) { waterQueued = true; requestAnimationFrame(updateWater); } };
+function waterTint() {
+  const night = S.time < 6.5 || S.time > 20.5;
+  const c = waterPlane.material.uniforms.col.value;
+  // (the ripples are stored at half their value: x 2 in the shader; the own water's texture is its true colour)
+  if (WATER === 'own') c.setRGB(0.5, 0.5, 0.5); else c.setHex(WATER_COL[WATER] || 0xffffff);
+  if (night) c.multiplyScalar(0.4);
+}
+function waterDetailFrom(img) {
+  // the painted water texture as grey ripples around 1, so the mean colour is BG's (measured in game: AR's river
+  // shows 27, 107, 125, its tileset's mean); the own water keeps its colours
+  const c = waterDetailCv.getContext('2d'); c.drawImage(img, 0, 0, 256, 256);
+  const d = c.getImageData(0, 0, 256, 256), px = d.data; let mean = 0;
+  for (let i = 0; i < px.length; i += 4) mean += px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11;
+  mean /= px.length / 4;
+  if (WATER !== 'own') for (let i = 0; i < px.length; i += 4) {
+    const l = px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11, v = Math.max(0, Math.min(255, 255 * (0.98 + (l - mean) / mean * 0.5) / 2));
+    px[i] = px[i + 1] = px[i + 2] = v;
+  }
+  c.putImageData(d, 0, 0); waterDetail.needsUpdate = true;
+}
+function waterLook() {
+  const i = GROUNDS.findIndex((g, k) => isWater(k) && layerUsed[k]), k = i >= 0 ? i : GROUNDS.findIndex((g, n) => isWater(n));
+  if (k >= 0 && groundImgs[k]) waterDetailFrom(groundImgs[k]);
+  waterPlane.material.uniforms.rep.value.set(W / 4, D / 4); waterTint();
+}
 const patterns = [];
 let layer = 4, maskDirty = false, dirtyLayers = new Set(), layerUsed = GROUNDS.map((g, i) => i === 0);   // the dirt path first: grass is already everywhere
 function loadImg(src) { return new Promise((ok, no) => { const i = new Image(); if (src.startsWith(UL)) i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = no; i.src = src; }); }
@@ -478,7 +545,7 @@ function compose(x, y, w, h) {
   });
   gctx.save(); gctx.globalCompositeOperation = 'overlay'; gctx.globalAlpha = 0.7;
   gctx.drawImage(macro, x, y, w, h, x, y, w, h); gctx.restore();
-  groundTex.needsUpdate = true;
+  groundTex.needsUpdate = true; queueWater();
 }
 function paintAt(pt) {
   const r = +$('bSize').value, a = +$('bStr').value;
@@ -1555,7 +1622,7 @@ function setTime(h) {
   // the sun stands south-west at 45°. It stays there all day (the moon too); the hour only sets colour and strength
   const day = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
   sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 80);
-  const night = h < 6.5 || h > 20.5; refreshFires(night); refreshLights();
+  const night = h < 6.5 || h > 20.5; refreshFires(night); refreshLights(); waterTint();
   for (const m of treeMats.sprite) m.color.copy(spriteTint());
   // calibrated on the Blender render of the same map (Camp, 2026-11-04: mean colour within 1 % by day, 2-12 % by
   // night): the preview models and textures are warmer than the render's, so the lights are white-balanced cooler.
@@ -1568,8 +1635,7 @@ $('tDay').onclick = () => { setTime(14); changed(); }; $('tNight').onclick = () 
 
 /* ---------- tray ---------- */
 // tray filters: category (icon buttons, by object type), place (#group, the model's group) and the search box
-let WATER = 'WTRIV';   // the built area's water overlay: one of BG's (water.rs; BG's river by default) or 'own' (the painted texture, moving)
-$('waterKind').onchange = () => { WATER = $('waterKind').value; changed(); };
+$('waterKind').onchange = () => { WATER = $('waterKind').value; waterLook(); changed(); };
 let trayCat = null, lostItems = [], MINE = false; try { MINE = localStorage.getItem('map3d.mine') === '1'; } catch {}
 function buildTray() {
   const groups = [...new Set(Object.values(M).filter(m => !m.notray).map(m => m.group))].sort();
@@ -1728,7 +1794,7 @@ async function openMap(id) {
   // each map keeps its own scale; the first maps were made at 60 px/m and move to the default, keeping their size in metres
   PXM = d.px_per_m && d.px_per_m !== 60 ? d.px_per_m : PXM_DEFAULT;
   if (d.px_per_m === 60) { tiles = tiles.map(v => Math.round(v * PXM / 60)); info.tiles = tiles; fillMapSel(); dirty = true; saveIndex(); }
-  WATER = d.water || 'WTRIV'; $('waterKind').value = WATER;
+  WATER = d.water || 'WTRIV'; $('waterKind').value = WATER; setTimeout(waterLook, 0);
   ELEV_DEG = d.elev >= 30 && d.elev <= 60 ? d.elev : ELEV_DEFAULT; ELEV = ELEV_DEG * Math.PI / 180;
   pxmShow();
   dropVariants(); layerUsed = GROUNDS.map((g, i) => i === 0);
@@ -1861,6 +1927,7 @@ function loop() {
   requestAnimationFrame(loop); if (orbit.enabled) orbit.update();
   const now = performance.now(); if (FAST && now - lastInput > 500 && now - lastDraw < 250) return; lastDraw = now;
   for (const o of objs) if (o.sprite) o.sprite.quaternion.copy(o.node.quaternion).invert();
+  if (waterPlane.visible && !FAST) waterPlane.material.uniforms.off.value.set(now / 60000, Math.sin(now / 4000) * 0.03);   // a slow drift, a little swell
   const fi = FAST ? 0 : Math.floor(now / 66); for (const k in fireTex) fireTex[k].offset.x = (fi % FIRE_BAMS[k].frames) / FIRE_BAMS[k].frames;
   renderer.render(scene, cam); placeGizmo();
 }
